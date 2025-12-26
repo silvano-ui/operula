@@ -1,0 +1,796 @@
+OPERULA
+ARCHITETTURA TECNICA v1.0 (FREEZATA – DEFINITIVA)
+
+Scritto il giorno di Natale del 2025 da Silvano Agostino Carta
+
+=================================================================
+
+Operula Light • Operula Full
+Web-first • SEO-first • Cash-first • Affiliate-driven
+
+Documento rielaborato secondo considerazioni LOGICHE e OPERATIVE
+emerse in fase di revisione.
+
+Questo file NON serve a convincere altri.
+Serve a ricordare a ME, nel tempo, PERCHÉ certe scelte sono state fatte.
+
+Operula non deve essere intelligente.
+Deve essere disciplinata.
+
+SCRIPTA MANENT. SEMPER.
+
+=================================================================
+
+CONTENUTO
+1.	Visione reale di Operula
+2.	Light vs Full – separazione non negoziabile
+3.	Principi architetturali definitivi (anti-deriva)
+4.	Stack tecnologico (minimo che paga)
+5.	Architettura generale
+6.	Database core – minimo vitale
+7.	Backend Laravel – struttura e disciplina
+8.	Filament Admin – uso controllato
+9.	Frontend Blade – SEO e conversione
+10.	Tracking & redirect affiliate
+11.	SEO: aspettative corrette
+12.	Content pipeline prudente
+13.	Legal & compliance senza autolesionismo
+14.	KPI reali e break-even
+15.	Timeline raddrizzata e motivata
+16.	Ranking model – DNA (relevance + quality + monetization)
+17.	Brand mix – qualità prima del denaro
+18.	Data ingestion – feed + scraping (uso responsabile)
+19.	Evoluzione Operula Full (condizionata)
+20.	Criteri di freeze architetturale
+21.	Le 3 regole finali
+22.	Changelog dei pesi & log operativo (SCRIPTA MANENT)
+
+=================================================================
+1.	VISIONE REALE DI OPERULA
+
+Operula NON è un progetto editoriale.
+Operula NON è una piattaforma lifestyle.
+Operula NON è un esercizio di architettura.
+
+Operula è uno STRUMENTO DI MONETIZZAZIONE.
+
+Obiettivo primario:
+•	generare commissioni affiliate nel minor tempo possibile
+
+Obiettivo secondario:
+•	finanziare PROTUE senza bruciare tempo, energia e lucidità
+
+Promemoria:
+Se Operula non produce cash, sta FALLENDO, anche se è ben fatta.
+
+=================================================================
+2.	LIGHT VS FULL – SEPARAZIONE NON NEGOZIABILE
+
+OPERULA LIGHT (v1.x)
+•	web-only
+•	SEO + piccoli Ads
+•	nessun account utente
+•	nessuna AI di massa
+•	nessuna app
+•	categorie: moda, gioielli, borse, accessori, orologi < 20k
+
+OPERULA FULL (v2.0+)
+•	ESISTE SOLO DOPO
+•	revenue stabile e crescente
+•	aggiunge utenti, wishlist, alert, AI, multi-country
+•	espande categorie: automobili, yacht, ville, orologi alta gamma
+
+Motivazione:
+Aggiungere complessità PRIMA del cash aumenta solo:
+•	costi
+•	frustrazione
+•	probabilità di abbandono
+
+=================================================================
+3.	PRINCIPI ARCHITETTURALI DEFINITIVI
+
+CASH-FIRST
+Ogni feature deve poter aumentare CTR, conversione o revenue.
+
+SEO-FIRST
+Ogni pagina è una landing page.
+
+SIMPLE-FIRST
+La soluzione più semplice che funziona è sempre quella giusta.
+
+NO VANITY
+Feature eleganti ma inutili sono vietate.
+
+DIVIETI (Light):
+•	SPA / React / Vue
+•	PWA
+•	App native
+•	Login obbligatorio
+•	AI massiva
+
+Promemoria:
+Ogni violazione di questi principi è una deriva.
+
+=================================================================
+4.	STACK TECNOLOGICO (MINIMO CHE PAGA)
+
+Backend:
+•	PHP 8.3
+•	Laravel 11
+
+Admin:
+•	Filament v3
+
+Frontend:
+•	Blade server-side
+•	Tailwind CSS
+•	Alpine.js SOLO se indispensabile
+
+Database:
+•	MySQL / MariaDB
+
+Motivazione:
+Questo stack:
+•	è veloce da sviluppare
+•	è stabile
+•	è SEO-friendly
+•	non introduce complessità non necessaria
+
+=================================================================
+5.	ARCHITETTURA GENERALE
+
+```
+•	monolite Laravel
+•	single database
+•	single brand
+•	singolo VPS
+```
+
+NO multi-tenancy in Light.
+
+Motivazione:
+La multi-tenancy NON aumenta revenue in Operula Light.
+
+=================================================================
+6.	DATABASE CORE – MINIMO VITALE
+
+Tabelle ESSENZIALI per partire:
+•	brands (tier, has_affiliate)
+•	categories
+•	products
+•	affiliate_links
+•	clicks
+•	ranking_configs (pesi)
+
+Tabelle DELIBERATAMENTE escluse all’inizio:
+•	revenues
+•	analytics avanzate
+
+Motivazione:
+Meno tabelle = meno bug = più velocità = più possibilità di lanciare.
+
+=================================================================
+7.	BACKEND LARAVEL – DISCIPLINA
+
+Regola assoluta:
+Controller = routing + validazione
+Service = logica business
+
+Cartelle chiave:
+•	app/Models
+•	app/Services/Product
+•	app/Services/Affiliate
+•	app/Services/Ranking
+•	app/Http/Controllers
+
+Motivazione:
+La separazione evita refactor quando (se) Operula cresce.
+
+=================================================================
+8.	FILAMENT ADMIN – USO CONTROLLATO
+
+Filament serve SOLO per:
+•	gestire brand (tier, affiliate status)
+•	gestire prodotti
+•	verificare link affiliate
+•	vedere click
+•	configurare ranking (pesi, cap, stagionalità)
+
+NON serve per:
+•	dashboard complesse
+•	vanity metrics
+
+Promemoria:
+Tempo speso in admin ≠ crescita del sito.
+
+=================================================================
+9.	FRONTEND BLADE – SEO E CONVERSIONE
+
+Pagine indispensabili:
+•	home
+•	categoria
+•	brand
+•	prodotto
+•	come-ci-finanziamo
+
+URL semplici, contenuto leggibile, CTA chiare.
+
+Motivazione:
+Google indicizza pagine, non architetture.
+
+=================================================================
+10.	TRACKING & REDIRECT AFFILIATE
+
+Flusso unico:
+/go/{uuid} → log click → redirect 302
+
+Motivazione:
+Server-side tracking riduce perdita dati e dipendenza dai network.
+
+=================================================================
+11.	SEO – ASPETTATIVE CORRETTE
+
+Fatti da ricordare:
+•	SEO richiede 3–6 mesi
+•	i primi 30–60 giorni sono rumorosi
+
+Strategia:
+•	long-tail keyword
+•	categorie strette
+•	pochi prodotti mirati
+
+Ads piccoli SOLO per validazione precoce.
+
+=================================================================
+12.	CONTENT PIPELINE – PRUDENTE
+
+Versione iniziale:
+•	feed XML dove disponibili
+•	scraping SOLO per brand strategici
+•	descrizioni minime
+•	AI SOLO per prodotti featured
+
+Motivazione:
+AI su tutto = costo anticipato senza prova di revenue.
+
+=================================================================
+13.	LEGAL & COMPLIANCE – SENZA AUTOLESIONISMO
+
+Obbligatorio:
+•	disclosure generico (footer)
+•	pagina “Come ci finanziamo”
+•	cookie banner GDPR
+•	privacy policy
+•	termini di servizio
+
+VIETATO:
+•	badge “Suggerito” o “Sponsorizzato” sui singoli prodotti
+
+Motivazione:
+Compliance sì, ma senza penalizzare CTR e fiducia.
+
+TESTO DISCLOSURE SUGGERITO (footer):
+“Operula partecipa a programmi di affiliazione. Quando acquisti
+tramite i nostri link, potremmo ricevere una commissione senza
+costi aggiuntivi per te. Questo ci permette di mantenere il
+servizio gratuito. Scopri di più: Come ci finanziamo.”
+
+=================================================================
+14.	KPI REALI E BREAK-EVEN
+
+Break-even stimato:
+•	~750 visite/mese
+
+Metriche da guardare:
+•	CTR prodotto
+•	click totali
+•	revenue network
+•	score traffico/rendita (trend)
+
+Promemoria:
+Se queste metriche non crescono, nulla ha senso.
+
+=================================================================
+15.	TIMELINE RADDRIZZATA (CON PERCHÉ)
+
+FASE 0 – SETUP (Settimane 1–2)
+•	Laravel + Filament
+•	DB core
+•	CRUD prodotti
+
+Perché:
+Senza base tecnica solida, il contenuto è tempo perso.
+
+FASE 1 – CONTENUTO MINIMO (Settimane 3–4)
+•	50–100 prodotti
+•	link affiliate funzionanti
+•	sito online
+
+Perché:
+Prima si testa il flusso, poi si scala.
+
+FASE 2 – VALIDAZIONE (Mesi 2–3)
+•	osservare CTR
+•	piccoli ads
+•	STOP feature
+
+Perché:
+I dati devono decidere, non l’entusiasmo.
+
+FASE 3 – OTTIMIZZAZIONE (Mesi 3–6)
+•	SEO
+•	AI mirata
+•	espansione catalogo
+
+Perché:
+Solo ora ha senso investire tempo e soldi.
+
+=================================================================
+16.	RANKING MODEL – DNA (RELEVANCE + QUALITY + MONETIZATION)
+
+OBIETTIVO (da ricordare):
+Il ranking deve sembrare organico e utile all’utente, ma deve anche
+favorire leggermente ciò che monetizza, SENZA degradare la qualità.
+
+Perché è critico:
+•	Se spingi troppo la monetizzazione: perdi fiducia, CTR e SEO.
+•	Se ignori la monetizzazione: fai traffico “gratis” e non incassi.
+•	Il ranking è il punto in cui Operula diventa “cellula viva” (DNA).
+
+-----
+
+16.1 PROPORZIONI (PESI UFFICIALI v1.0)
+
+Formula base (default globale):
+
+score_finale = (relevance_score * 0.70)
++ (quality_score   * 0.20)
++ (monetization_score * 0.10)
+
+Motivazione dei pesi:
+•	70% Relevance: l’utente deve trovare ciò che cerca (altrimenti rimbalza)
+•	20% Quality: la qualità sostiene fiducia e posizionamento SEO nel tempo
+•	10% Monetization: abbastanza per far cassa, troppo poco per “puzzare”
+
+Nota:
+I pesi sono configurabili per categoria e stagione tramite ranking_configs,
+ma il default rimane questo finché non ci sono dati storici affidabili.
+
+-----
+
+16.2 COMPONENTE 1: RELEVANCE SCORE (70%)
+
+relevance_score = text_match + filter_match + freshness_bonus
+
+Dove:
+•	text_match (0–1): corrispondenza query ↔ titolo/brand/categoria
+•	filter_match (0–1): corrispondenza filtri (prezzo, taglia, colore)
+•	freshness_bonus (0–0.05): prodotti nuovi
+
+Motivazione:
+La relevance è ciò che fa percepire Operula come “utile”.
+Se la relevance cala, cala tutto (CTR, tempo pagina, SEO).
+
+-----
+
+16.3 COMPONENTE 2: QUALITY SCORE (20%)
+
+quality_score = brand_tier + completeness + historical_ctr
+
+Dove:
+•	brand_tier (0–1): tier interno 1–10 normalizzato
+•	completeness (0–1): scheda completa (immagini, descrizione, attributi)
+•	historical_ctr (0–1): CTR storico (solo dopo 2+ mesi dati)
+
+Motivazione:
+La quality difende:
+•	credibilità (brand prestigiosi)
+•	SEO (engagement e comportamento utente)
+•	conversioni indirette (utente torna)
+
+-----
+
+16.4 COMPONENTE 3: MONETIZATION SCORE (10%)
+
+monetization_score = has_affiliate + commission_tier + network_reliability
+
+Dove:
+•	has_affiliate: link attivo = 0.5, altrimenti 0
+•	commission_tier:
+- <5%   = 0.1
+- 5–10% = 0.2
+- >10%  = 0.3
+•	network_reliability: network affidabile = 0.2, altrimenti 0
+
+Motivazione:
+Monetization deve “spingere”, ma in modo invisibile.
+Operula non deve mai sembrare una vetrina sponsorizzata.
+
+-----
+
+16.5 CORRETTIVO 1: CAP MONETIZATION DINAMICO
+
+Il boost monetization non può superare un cap configurabile.
+
+monetization_boost_max = base_cap * market_modifier
+
+Default:
+•	base_cap = 0.20 (20%)
+•	market_modifier = 0.5 → 1.5
+
+Esempi:
+•	Periodo normale: cap 20% (modifier 1.0)
+•	Black Friday / saldi: cap 30% (modifier 1.5)
+•	Categoria ultra-lusso (orologi >50k): cap 10% (modifier 0.5)
+
+Motivazione:
+Il cap impedisce che la monetizzazione “rompa” la relevance.
+
+-----
+
+16.6 CORRETTIVO 2: PRESTIGE BONUS (brand NO-affiliate)
+
+I brand top-tier senza affiliate ricevono un bonus compensativo.
+
+IF brand.tier >= 9 AND brand.has_affiliate == false:
+quality_score += prestige_bonus
+
+Dove:
+•	prestige_bonus = 0.15 → 0.25 (default 0.20)
+
+Motivazione:
+Brand come Hermès/Chanel/Patek senza affiliate non devono sparire:
+•	i clienti li cercano
+•	portano SEO e credibilità
+•	evitano che Operula sembri “chi paga di più vince”
+
+-----
+
+16.7 ESEMPIO PRATICO (da ricordare)
+
+Query: “borsa Birkin”
+
+|Prodotto                        |Relev.|Qual.|Monet.|Prestige|SCORE|
+|--------------------------------|------|-----|------|--------|-----|
+|Birkin (Hermès.com, no aff, T10)|0.95  |0.95 |0.0   |+0.20   |0.92 |
+|Birkin (Vestiaire, 8%, T7)      |0.90  |0.75 |0.8   |0       |0.86 |
+|Birkin (Rebag, 12%, T6)         |0.85  |0.70 |1.0   |0       |0.84 |
+
+Interpretazione:
+Hermès vince per prestige + relevance, NON per monetizzazione.
+Operula resta credibile, ma monetizza comunque sui reseller.
+
+-----
+
+16.8 CONFIGURAZIONE FILAMENT (ranking_configs)
+
+Tabella: ranking_configs
+
+|Campo              |Tipo   |Default|Note                |
+|-------------------|-------|-------|--------------------|
+|category_id        |FK     |null   |null = globale      |
+|relevance_weight   |decimal|0.70   |peso relevance      |
+|quality_weight     |decimal|0.20   |peso quality        |
+|monetization_weight|decimal|0.10   |peso monetization   |
+|monetization_cap   |decimal|0.20   |cap max boost       |
+|market_modifier    |decimal|1.00   |stagionalità        |
+|prestige_bonus     |decimal|0.20   |bonus tier>=9 no aff|
+|prestige_threshold |int    |9      |soglia tier         |
+|valid_from         |date   |null   |inizio validità     |
+|valid_to           |date   |null   |fine validità       |
+
+Promemoria:
+I pesi NON si cambiano per “sensazione”.
+Si cambiano solo dopo dati reali (mese 2–3) e con log delle modifiche.
+
+=================================================================
+17.	BRAND MIX – QUALITÀ PRIMA DEL DENARO
+
+PRINCIPIO:
+Per offrire risultati di qualità eccellente, Operula indicizza
+TUTTI i brand rilevanti, indipendentemente dallo status affiliate.
+
+-----
+
+TIER SYSTEM:
+
+TIER 1 - AFFILIATE ATTIVI (priorità revenue)
+•	hanno programma affiliate attivo
+•	commissioni >= 5%
+•	esempi: Farfetch, MyTheresa, NET-A-PORTER, SSENSE,
+Vestiaire Collective, The RealReal, Rebag
+
+TIER 2 - AFFILIATE MARGINALI (volume)
+•	hanno affiliate ma commissioni basse (<5%)
+•	o programmi instabili
+•	utili per completezza catalogo
+
+TIER 3 - NO AFFILIATE (qualità/SEO)
+•	brand prestigiosi senza programma affiliate
+•	necessari per credibilità risultati
+•	esempi: Hermès, Chanel, Louis Vuitton (diretto),
+Patek Philippe, Rolex (diretto)
+•	ricevono prestige_bonus nel ranking
+
+-----
+
+GESTIONE UX:
+•	NESSUNA differenza visiva tra prodotti affiliate e non-affiliate
+•	l’utente non deve percepire distinzione
+•	CTA uniforme (“Vai al sito”, “Vedi prezzo”)
+
+-----
+
+TRACCIAMENTO INTERNO:
+Anche i click su prodotti non-affiliate vengono tracciati per:
+•	capire quali brand portano traffico senza revenue
+•	leverage per future negoziazioni affiliate
+•	dati per decidere se mantenere brand in catalogo
+
+-----
+
+REGOLA ANTI-CANNIBALIZZAZIONE:
+
+Se stesso prodotto disponibile su:
+•	sito ufficiale (no affiliate)
+•	retailer (affiliate)
+
+Mostrare ENTRAMBI ma:
+•	retailer con boost monetization
+•	sito ufficiale con prestige bonus se tier >= 9
+•	lasciare che formula ranking decida
+
+L’utente sceglie, noi ottimizziamo le probabilità.
+
+=================================================================
+18.	DATA INGESTION – USO RESPONSABILE
+
+PRINCIPIO:
+Approccio ibrido per bilanciare qualità dati e manutenzione.
+
+-----
+
+STRATEGIA:
+
+FONTE 1 - FEED XML (priorità)
+•	usare dove disponibili (network affiliate)
+•	meno manutenzione
+•	aggiornamento automatico
+•	esempi: Awin, Tradedoubler, CJ, ShareASale
+
+FONTE 2 - SCRAPING DIRETTO (selettivo)
+•	solo per brand strategici senza feed
+•	brand tier >= 8
+•	o brand con alto volume ricerche
+
+-----
+
+PERCHÉ SCRAPING PER LUSSO:
+•	feed XML dei network spesso incompleti
+•	brand top non danno feed pubblici
+•	prezzi e disponibilità cambiano spesso
+•	dati più freschi = migliore UX
+
+-----
+
+COSTI SCRAPING (da gestire):
+•	manutenzione continua (siti cambiano struttura)
+•	rischio ban/blocco IP
+•	risorse server per crawling
+
+MITIGAZIONI:
+•	scraping notturno / bassa frequenza
+•	rotazione IP se necessario
+•	monitoraggio automatico struttura pagine
+•	fallback su dati cached se scraping fallisce
+
+-----
+
+PRIORITÀ IMPLEMENTAZIONE:
+
+FASE 1 (Light launch):
+•	solo feed XML da network affiliate
+•	scraping manuale/semi-auto per 10-20 brand top
+
+FASE 2 (post-validazione):
+•	scraping automatizzato per brand strategici
+•	sistema alert per rotture struttura
+
+Motivazione:
+Feed XML come default, scraping come eccezione.
+Scraping = manutenzione continua e rischio.
+
+=================================================================
+19.	EVOLUZIONE OPERULA FULL
+
+Operula Full entra in PIANIFICAZIONE OPERATIVA quando:
+•	score traffico/rendita positivo e in crescita costante
+•	(considerando stagionalità moda/lusso)
+•	indicativamente da €800–1.000/mese
+
+Operula Full entra in SVILUPPO ATTIVO quando:
+•	revenue stabile per almeno 3 mesi
+•	trend confermato
+
+Altrimenti:
+•	Operula resta Light
+
+CATEGORIE OPERULA FULL (future):
+•	Orologi alta gamma (> €20.000)
+•	Automobili lusso
+•	Yacht e nautica
+•	Immobili lusso (ville, attici)
+•	Arte e collectibles
+•	Viaggi luxury
+
+Perché rimandate:
+•	ciclo vendita lungo
+•	commission complesse (lead-based)
+•	richiedono contenuti premium
+•	SEO molto competitivo
+•	necessitano trust già costruito
+
+=================================================================
+20.	FREEZE ARCHITETTURALE
+
+Operula Light v1.0 è FREEZATA fino a revenue stabile.
+
+Cosa significa FREEZE:
+•	nessuna nuova feature
+•	nessun refactor architetturale
+•	nessuna aggiunta di complessità
+•	solo bug fix e ottimizzazioni SEO
+
+Quando si sblocca:
+•	revenue stabile per 3 mesi
+•	decisione documentata nel log operativo
+
+=================================================================
+21.	LE 3 REGOLE FINALI
+
+(1) SE NON PAGA, SI ELIMINA.
+
+(2) SE NON È NECESSARIO ORA, NON SI FA.
+
+(3) SE CREA DUBBI, SI RIMANDA.
+
+Promemoria finale:
+Meglio una Operula imperfetta che incassa
+che una perfetta che non parte.
+
+=================================================================
+22.	CHANGELOG DEI PESI & LOG OPERATIVO (SCRIPTA MANENT)
+
+Questa sezione è OBBLIGATORIA.
+Non è documentazione estetica.
+È un meccanismo di autodifesa decisionale.
+
+OBIETTIVO:
+•	evitare modifiche impulsive
+•	evitare tuning “a sensazione”
+•	mantenere memoria storica delle decisioni
+
+-----
+
+FILE DI RIFERIMENTO (INDICE):
+
+```
+•	/storage/logs/operula_ranking_changelog.log   → modifiche pesi ranking
+•	/storage/logs/operula_operational_log.log    → decisioni operative
+•	/storage/logs/operula_errors.log             → errori tecnici (standard Laravel)
+```
+
+-----
+
+22.1 CHANGELOG DEI PESI (RANKING)
+
+Ogni modifica ai pesi del ranking DEVE:
+•	essere scritta
+•	essere motivata
+•	essere datata
+•	essere correlata a dati osservabili
+
+File dedicato:
+/storage/logs/operula_ranking_changelog.log
+
+Formato entry:
+
+[YYYY-MM-DD HH:MM]
+AUTORE: Silvano
+AZIONE: Modifica pesi ranking
+PRIMA:
+relevance_weight    = 0.70
+quality_weight      = 0.20
+monetization_weight = 0.10
+DOPO:
+relevance_weight    = 0.65
+quality_weight      = 0.25
+monetization_weight = 0.10
+MOTIVAZIONE:
+CTR medio prodotti luxury alto ma bounce elevato.
+Rafforzata quality per migliorare permanenza.
+DATI DI SUPPORTO:
+Periodo osservazione: 2025-02-01 → 2025-02-28
+CTR medio: 14.2%
+Bounce rate: 68%
+NOTE:
+Rivalutare dopo 30 giorni.
+
+-----
+
+22.2 LOG OPERATIVO GIORNALIERO (DAY-0 →)
+
+Oltre al changelog dei pesi, Operula DEVE mantenere
+un LOG OPERATIVO CONTINUO.
+
+Perché:
+•	la memoria umana mente
+•	le decisioni senza contesto diventano errori
+•	il log evita di ripetere sbagli
+
+File dedicato:
+/storage/logs/operula_operational_log.log
+
+Cosa va scritto (OGNI VOLTA):
+•	modifiche architetturali
+•	aggiunta/rimozione categorie
+•	aggiunta/rimozione brand
+•	attivazione scraping
+•	disattivazione feed
+•	cambi di strategia SEO
+•	attivazione campagne Ads
+•	qualsiasi decisione che impatta revenue o struttura
+
+Formato entry:
+
+[YYYY-MM-DD HH:MM]
+TIPO: Decisione operativa
+AREA: SEO | Ranking | Affiliate | Contenuto | Tech | Business
+AZIONE:
+Aggiunta categoria “Orologi < 20k”
+MOTIVAZIONE:
+Volume ricerche alto + commissioni 8–12%
+CONSEGUENZA ATTESA:
+Aumento traffico long-tail
+RIVALUTAZIONE:
+Tra 30 giorni
+
+-----
+
+22.3 REGOLA DI FERRO
+
+SE UNA MODIFICA NON È SCRITTA NEL LOG:
+•	è come se non fosse mai avvenuta
+•	NON va difesa
+•	NON va mantenuta
+
+Questa regola serve a proteggere:
+•	la disciplina
+•	la coerenza
+•	il focus sul cash
+
+-----
+
+22.4 PROMEMORIA FINALE (PER ME)
+
+```
+•	Il ranking è un organismo vivo, non un giocattolo.
+•	Ogni modifica deve avere una cicatrice scritta.
+•	Nessuna ottimizzazione senza dati.
+•	Nessuna decisione senza memoria.
+```
+
+Operula non deve essere intelligente.
+Deve essere disciplinata.
+
+SCRIPTA MANENT. SEMPER.
+
+=================================================================
+
+FINE DOCUMENTO
+
+OPERULA – Architettura Tecnica v1.0 (Definitiva)
+
+Scritto il giorno di Natale del 2025 da Silvano Agostino Carta
+
+SCRIPTA MANENT. SEMPER.
