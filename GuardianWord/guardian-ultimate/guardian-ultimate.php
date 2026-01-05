@@ -24,6 +24,7 @@ require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-license.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-modules.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-restore-points.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-db-backup.php';
+require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-db-backup-pro.php';
 
 // Existing modules (integrity/backup).
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-scanner.php';

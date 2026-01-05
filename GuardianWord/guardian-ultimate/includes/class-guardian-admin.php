@@ -128,6 +128,7 @@ final class Admin {
 		$settings['rp_scope_core'] = !empty($_POST['rp_scope_core']);
 		$settings['rp_scope_uploads'] = !empty($_POST['rp_scope_uploads']);
 		$settings['rp_include_db'] = !empty($_POST['rp_include_db']);
+		$settings['rp_db_engine'] = isset($_POST['rp_db_engine']) ? sanitize_text_field((string) wp_unslash($_POST['rp_db_engine'])) : 'basic';
 		$settings['rp_db_tables'] = isset($_POST['rp_db_tables']) ? sanitize_text_field((string) wp_unslash($_POST['rp_db_tables'])) : 'wp_core';
 		$settings['rp_db_custom_tables'] = isset($_POST['rp_db_custom_tables']) ? (string) wp_unslash($_POST['rp_db_custom_tables']) : '';
 		$settings['rp_db_max_seconds'] = isset($_POST['rp_db_max_seconds']) ? (int) $_POST['rp_db_max_seconds'] : 20;
@@ -503,6 +504,14 @@ final class Admin {
 
 		echo '<p><strong>' . esc_html__('Database (opzionale)', 'guardian') . '</strong><br />';
 		echo '<label><input type="checkbox" name="rp_include_db" ' . checked(!empty($settings['rp_include_db']), true, false) . ' /> ' . esc_html__('Include snapshot DB nel restore point (best-effort)', 'guardian') . '</label><br />';
+		$payload = $this->license->get_payload();
+		$backupPro = !empty($payload['feat']['backup_pro']);
+		$rpDbEngine = (string) ($settings['rp_db_engine'] ?? 'basic');
+		echo '<label>' . esc_html__('DB engine', 'guardian') . ' ';
+		echo '<select name="rp_db_engine">';
+		echo '<option value="basic"' . selected($rpDbEngine, 'basic', false) . '>' . esc_html__('Basic (single dump, no resume)', 'guardian') . '</option>';
+		echo '<option value="pro"' . selected($rpDbEngine, 'pro', false) . ($backupPro ? '' : ' disabled') . '>' . esc_html__('Pro (chunk/resume) - paid', 'guardian') . '</option>';
+		echo '</select></label><br />';
 		$rpDbTables = (string) ($settings['rp_db_tables'] ?? 'wp_core');
 		echo '<label>' . esc_html__('Tabelle', 'guardian') . ' ';
 		echo '<select name="rp_db_tables">';

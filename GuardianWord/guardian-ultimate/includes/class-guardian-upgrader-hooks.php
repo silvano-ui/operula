@@ -103,6 +103,9 @@ final class UpgraderHooks {
 				$exclude = ['wp-content/uploads/', 'wp-content/cache/', 'wp-content/upgrade/'];
 				$rp = $this->restorePoints->create('pre_' . $type, $paths, $exclude, [
 					'include_db' => $includeDb,
+					'db_engine' => (string) ($settings['rp_db_engine'] ?? 'basic'),
+					// License gating is handled in Plugin/Admin; upgrader hook is best-effort and runs with settings.
+					'backup_pro' => true,
 					'db_tables_mode' => (string) ($settings['rp_db_tables'] ?? 'wp_core'),
 					'db_custom_tables' => (string) ($settings['rp_db_custom_tables'] ?? ''),
 					'db_max_seconds' => (int) ($settings['rp_db_max_seconds'] ?? 20),

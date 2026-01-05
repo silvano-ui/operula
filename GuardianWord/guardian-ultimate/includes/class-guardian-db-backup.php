@@ -194,6 +194,11 @@ final class DbBackup {
 		return $base . '/db/' . sanitize_file_name($id) . '.sql.gz';
 	}
 
+	// Exposed for DbBackupPro.
+	public function select_tables_public(string $mode, string $customTables): array {
+		return $this->select_tables($mode, $customTables);
+	}
+
 	private function select_tables(string $mode, string $customTables): array {
 		global $wpdb;
 		$prefix = $wpdb->prefix;

@@ -18,7 +18,7 @@ final class RestorePoints {
 		$this->storage = $storage;
 	}
 
-	public function create_scheduled_from_settings(array $settings): ?array {
+	public function create_scheduled_from_settings(array $settings, bool $backupPro = false): ?array {
 		$paths = [];
 		$exclude = [
 			'wp-content/cache/',
@@ -51,6 +51,8 @@ final class RestorePoints {
 			'db_tables_mode' => (string) ($settings['rp_db_tables'] ?? 'wp_core'),
 			'db_custom_tables' => (string) ($settings['rp_db_custom_tables'] ?? ''),
 			'db_max_seconds' => (int) ($settings['rp_db_max_seconds'] ?? 20),
+			'db_engine' => $backupPro ? (string) ($settings['rp_db_engine'] ?? 'basic') : 'basic',
+			'backup_pro' => $backupPro,
 		];
 
 		return $this->create('scheduled', $paths, $exclude, $opts);
@@ -148,16 +150,38 @@ final class RestorePoints {
 
 		// Optional DB snapshot (best-effort).
 		if (!empty($opts['include_db'])) {
-			require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-db-backup.php';
-			$db = new DbBackup($this->storage);
-			$dbRes = $db->export([
-				'tables_mode' => (string) ($opts['db_tables_mode'] ?? 'wp_core'),
-				'custom_tables' => (string) ($opts['db_custom_tables'] ?? ''),
-				'max_seconds' => (int) ($opts['db_max_seconds'] ?? 20),
-				'label' => $label,
-				'restore_point_id' => $id,
-			]);
-			$manifest['db'] = $dbRes;
+			$engine = (string) ($opts['db_engine'] ?? 'basic');
+			$engine = in_array($engine, ['basic', 'pro'], true) ? $engine : 'basic';
+			if ($engine === 'pro' && !empty($opts['backup_pro'])) {
+				$pro = new DbBackupPro($this->storage);
+				$job = $pro->start_export_job([
+					'restore_point_id' => $id,
+					'tables_mode' => (string) ($opts['db_tables_mode'] ?? 'wp_core'),
+					'custom_tables' => (string) ($opts['db_custom_tables'] ?? ''),
+					'max_seconds' => (int) ($opts['db_max_seconds'] ?? 20),
+				]);
+				$manifest['db'] = $job;
+
+				// Kick job now and schedule continuation.
+				if (!empty($job['job_id'])) {
+					$pro->continue_export_job((string) $job['job_id']);
+					if (!wp_next_scheduled('guardian_dbpro_export', [(string) $job['job_id']])) {
+						wp_schedule_single_event(time() + 60, 'guardian_dbpro_export', [(string) $job['job_id']]);
+					}
+					$manifest['db'] = $pro->build_manifest_meta_from_job((string) $job['job_id']);
+				}
+			} else {
+				$db = new DbBackup($this->storage);
+				$dbRes = $db->export([
+					'tables_mode' => (string) ($opts['db_tables_mode'] ?? 'wp_core'),
+					'custom_tables' => (string) ($opts['db_custom_tables'] ?? ''),
+					'max_seconds' => (int) ($opts['db_max_seconds'] ?? 20),
+					'label' => $label,
+					'restore_point_id' => $id,
+				]);
+				$dbRes['engine'] = 'basic';
+				$manifest['db'] = $dbRes;
+			}
 		}
 
 		$ok = $this->storage->write_json_gz($manifestPath, $manifest);
@@ -170,10 +194,14 @@ final class RestorePoints {
 	}
 
 	public function restore_db(string $restorePointId): array {
-		require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-db-backup.php';
 		$manifest = $this->load_manifest($restorePointId);
 		if (!$manifest || empty($manifest['db']) || !is_array($manifest['db'])) {
 			return ['ok' => false, 'message' => 'no db snapshot in restore point'];
+		}
+		$engine = isset($manifest['db']['engine']) ? (string) $manifest['db']['engine'] : 'basic';
+		if ($engine === 'pro') {
+			$pro = new DbBackupPro($this->storage);
+			return $pro->restore_from_manifest($manifest['db']);
 		}
 		$db = new DbBackup($this->storage);
 		return $db->restore_from_manifest($manifest['db']);

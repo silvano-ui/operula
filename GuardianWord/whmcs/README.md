@@ -24,6 +24,7 @@ Questa cartella contiene un **addon module WHMCS** che gestisce:
    - usa **configurable options** (opzionale) per definire tipo licenza, es:
      - `guardian_license_type`: `trial`, `annual`, `biennial`
      - `guardian_modules`: lista moduli (es: `integrity,backup,security,health`) oppure `backup+security`
+     - `guardian_backup_tier`: `basic` / `pro` (abilita feature a pagamento “Backup Pro”)
    - in alternativa, il modulo usa il billing cycle e la `nextduedate` del servizio.
    - in alternativa/aggiunta, puoi usare **Product Addons** con nomi contenenti:
      - `backup` → abilita modulo backup
@@ -98,4 +99,5 @@ Il token include `feat.plan`:
 
 Il token include anche:
 - `feat.modules`: array moduli abilitati (es. `["core","integrity","backup"]`)
+- `feat.backup_pro`: true/false (feature a pagamento “Backup Pro”)
 

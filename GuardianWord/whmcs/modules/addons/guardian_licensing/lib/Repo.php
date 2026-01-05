@@ -168,6 +168,7 @@ final class Repo
 		$token = null;
 		$modules = self::computeModules($svc);
 		$plan = self::computePlan($svc);
+		$backupPro = self::computeBackupPro($svc);
 		if ($status === 'active' && $domain !== '') {
 			$payload = [
 				'v' => 1,
@@ -180,6 +181,7 @@ final class Repo
 					'plan' => $plan,
 					'type' => (string) ($svc['license_type'] ?? ''),
 					'modules' => $modules,
+					'backup_pro' => $backupPro,
 					'core' => true,
 					'integrity' => in_array('integrity', $modules, true),
 					'backup' => in_array('backup', $modules, true),
@@ -210,6 +212,7 @@ final class Repo
 		$data['ok'] = true;
 		$data['plan'] = $plan;
 		$data['modules'] = $modules;
+		$data['backup_pro'] = $backupPro;
 		return $data;
 	}
 
@@ -424,6 +427,24 @@ final class Repo
 		}
 		$out['core'] = true;
 		return array_keys($out);
+	}
+
+	private static function computeBackupPro(array $svc): bool
+	{
+		// Configurable option guardian_backup_tier=pro OR addon name contains "backup pro".
+		$tier = isset($svc['backup_tier']) ? strtolower((string) $svc['backup_tier']) : '';
+		if ($tier === 'pro' || $tier === 'ultimate') {
+			return true;
+		}
+		if (!empty($svc['addons']) && is_array($svc['addons'])) {
+			foreach ($svc['addons'] as $a) {
+				$a = is_string($a) ? strtolower($a) : '';
+				if ($a !== '' && strpos($a, 'backup pro') !== false) {
+					return true;
+				}
+			}
+		}
+		return false;
 	}
 
 	public static function getSetting(string $setting, string $default = ''): string

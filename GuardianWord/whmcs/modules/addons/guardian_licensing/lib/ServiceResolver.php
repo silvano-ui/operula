@@ -91,6 +91,12 @@ final class ServiceResolver
 		return self::configOptionValueForService($serviceId, 'guardian_license_type');
 	}
 
+	private static function backupTierForService(int $serviceId): string
+	{
+		$tier = self::configOptionValueForService($serviceId, 'guardian_backup_tier');
+		return $tier !== '' ? $tier : '';
+	}
+
 	private static function modulesForService(int $serviceId): array
 	{
 		$raw = self::configOptionValueForService($serviceId, 'guardian_modules');
@@ -121,6 +127,7 @@ final class ServiceResolver
 			'cycle' => (string) ($r->billingcycle ?? ''),
 			'package_id' => (int) ($r->packageid ?? 0),
 			'license_type' => self::licenseTypeForService($serviceId),
+			'backup_tier' => self::backupTierForService($serviceId),
 			'modules' => self::modulesForService($serviceId),
 			'addons' => self::addonsForService($serviceId),
 		];

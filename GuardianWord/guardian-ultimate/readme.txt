@@ -53,6 +53,13 @@ Se il modulo **Backup** è attivo, puoi abilitare restore point automatici (hour
 
 Puoi anche includere uno snapshot DB (best-effort) nel restore point.
 
+== Backup Pro (a pagamento) ==
+
+Se la licenza include `backup_pro`, puoi usare DB engine **Pro**:
+- dump a chunk con resume (più robusto su hosting lenti)
+- file separati per tabella/chunk + schema separato
+- restore più affidabile rispetto al dump unico “basic”
+
 == Limitazioni importanti ==
 
 - Modifiche fatte via FTP/SFTP, deploy, o script esterni: Guardian può rilevarle via snapshot manuale, ma non può garantire backup/rollback se non c’è un ZIP precedente.

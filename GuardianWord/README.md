@@ -16,7 +16,7 @@ php tools/license_gen.php gen-keys
 
 2) Copia `PUBLIC_KEY_B64` e incollala nel plugin in:
 
-- `guardian/includes/class-guardian-license.php` → `License::PUBLIC_KEY_B64`
+- `guardian-ultimate/includes/class-guardian-license.php` → `License::PUBLIC_KEY_B64`
 
 3) Genera un token per un dominio:
 
@@ -53,4 +53,10 @@ Nel modulo **Backup** è disponibile un “restore point” incrementale con ded
 - creazione automatica schedulata (hourly/daily/off) con scope configurabile
 - restore di un path (file o directory) a partire da un restore point
 - (opzionale) snapshot DB dentro il restore point (best-effort) + restore DB
+
+### Backup Pro (a pagamento)
+
+Se la licenza include `feat.backup_pro` (WHMCS: `guardian_backup_tier=pro`), puoi selezionare **DB engine = Pro**:
+- snapshot DB a chunk con resume (più stabile)
+- restore DB per step (schema + chunk per tabella)
 

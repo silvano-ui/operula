@@ -115,6 +115,7 @@ final class Storage {
 			'rp_scope_uploads' => false,
 			// DB snapshot inside restore point (best-effort)
 			'rp_include_db' => false,
+			'rp_db_engine' => 'basic', // basic|pro (pro requires feat.backup_pro)
 			'rp_db_tables' => 'wp_core', // wp_core|all_prefix|custom
 			'rp_db_custom_tables' => '',
 			'rp_db_max_seconds' => 20,
