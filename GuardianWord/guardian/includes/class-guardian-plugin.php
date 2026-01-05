@@ -31,10 +31,19 @@ final class Plugin {
 
 		// Prova a installare il MU-loader se possibile (opzionale).
 		$storage->maybe_install_mu_loader();
+
+		// Pianifica refresh licenza (WHMCS mode) se non già pianificato.
+		if (!wp_next_scheduled('guardian_license_refresh')) {
+			wp_schedule_event(time() + 300, 'hourly', 'guardian_license_refresh');
+		}
 	}
 
 	public static function deactivate(): void {
 		// Non rimuoviamo snapshot/backup automaticamente.
+		$ts = wp_next_scheduled('guardian_license_refresh');
+		if ($ts) {
+			wp_unschedule_event($ts, 'guardian_license_refresh');
+		}
 	}
 
 	public function boot(): void {
@@ -44,6 +53,12 @@ final class Plugin {
 		// Admin UI resta disponibile per inserire la licenza.
 		$this->admin = new Admin($this->storage, $this->license);
 		$this->admin->register();
+
+		add_action('guardian_license_refresh', function (): void {
+			if ($this->license->get_mode() === 'whmcs') {
+				$this->license->refresh_from_whmcs_if_needed(false);
+			}
+		});
 
 		// Se licenza non valida, non attiviamo monitoraggio/rollback.
 		if (!$this->license->is_valid()) {

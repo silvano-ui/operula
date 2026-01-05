@@ -16,6 +16,8 @@ final class Admin {
 	public function register(): void {
 		add_action('admin_menu', [$this, 'admin_menu']);
 		add_action('admin_post_guardian_save_license', [$this, 'handle_save_license']);
+		add_action('admin_post_guardian_fetch_license', [$this, 'handle_fetch_license']);
+		add_action('admin_post_guardian_reset_domain', [$this, 'handle_reset_domain']);
 		add_action('admin_post_guardian_create_snapshot', [$this, 'handle_create_snapshot']);
 		add_action('admin_post_guardian_rollback_last', [$this, 'handle_rollback_last']);
 		add_action('admin_post_guardian_restore_full_last', [$this, 'handle_restore_full_last']);
@@ -125,10 +127,46 @@ final class Admin {
 		}
 		check_admin_referer('guardian_save_license');
 
-		$token = isset($_POST['license_token']) ? (string) wp_unslash($_POST['license_token']) : '';
-		$this->license->save_token($token);
+		$mode = isset($_POST['license_mode']) ? (string) wp_unslash($_POST['license_mode']) : 'offline';
+		$this->license->set_mode($mode);
+
+		if ($mode === 'whmcs') {
+			$conf = [
+				'validate_url' => isset($_POST['whmcs_validate_url']) ? (string) wp_unslash($_POST['whmcs_validate_url']) : '',
+				'reset_url' => isset($_POST['whmcs_reset_url']) ? (string) wp_unslash($_POST['whmcs_reset_url']) : '',
+				'license_id' => isset($_POST['whmcs_license_id']) ? (string) wp_unslash($_POST['whmcs_license_id']) : '',
+				'api_secret' => isset($_POST['whmcs_api_secret']) ? (string) wp_unslash($_POST['whmcs_api_secret']) : '',
+			];
+			$this->license->save_whmcs_conf($conf);
+		} else {
+			$token = isset($_POST['license_token']) ? (string) wp_unslash($_POST['license_token']) : '';
+			$this->license->save_token($token);
+		}
 		$st = $this->license->status();
 		wp_safe_redirect(add_query_arg(['guardian_notice' => !empty($st['ok']) ? 'license_ok' : 'license_fail'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
+	public function handle_fetch_license(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_fetch_license');
+
+		$st = $this->license->refresh_from_whmcs_if_needed(true);
+		$ok = $st && !empty($st['ok']);
+		wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'license_ok' : 'license_fail'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
+	public function handle_reset_domain(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_reset_domain');
+
+		$r = $this->license->request_domain_reset();
+		wp_safe_redirect(add_query_arg(['guardian_notice' => !empty($r['ok']) ? 'domain_reset_ok' : 'domain_reset_fail'], admin_url('admin.php?page=guardian')));
 		exit;
 	}
 
@@ -139,6 +177,11 @@ final class Admin {
 
 		$op = $this->storage->get_last_operation();
 		$settings = $this->storage->get_settings();
+		// In modalità WHMCS: prova refresh soft (rispetta cache) quando apri la pagina.
+		if ($this->license->get_mode() === 'whmcs') {
+			$this->license->refresh_from_whmcs_if_needed(false);
+		}
+
 		$licenseStatus = $this->license->status();
 		$licensed = !empty($licenseStatus['ok']);
 
@@ -161,9 +204,34 @@ final class Admin {
 		echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
 		echo '<input type="hidden" name="action" value="guardian_save_license" />';
 		wp_nonce_field('guardian_save_license');
-		echo '<textarea name="license_token" rows="4" style="width: 100%; max-width: 1100px;" placeholder="Incolla qui la licenza (token)">' . esc_textarea($this->license->get_token()) . '</textarea>';
-		submit_button(__('Salva licenza', 'guardian'));
+
+		$mode = $this->license->get_mode();
+		echo '<p>';
+		echo '<label style="margin-right:12px;"><input type="radio" name="license_mode" value="offline" ' . checked($mode, 'offline', false) . ' /> ' . esc_html__('Token offline (incolla)', 'guardian') . '</label>';
+		echo '<label><input type="radio" name="license_mode" value="whmcs" ' . checked($mode, 'whmcs', false) . ' /> ' . esc_html__('WHMCS (auto-recupero)', 'guardian') . '</label>';
+		echo '</p>';
+
+		$conf = $this->license->get_whmcs_conf();
+		echo '<div style="padding:12px; border:1px solid #ddd; background:#fff; max-width:1100px;">';
+		echo '<h3 style="margin-top:0;">' . esc_html__('Configurazione WHMCS', 'guardian') . '</h3>';
+		echo '<p><label><strong>Validate URL</strong><br /><input type="url" name="whmcs_validate_url" style="width:100%;" value="' . esc_attr((string) $conf['validate_url']) . '" placeholder="https://whmcs.example.com/modules/addons/guardian_licensing/api/validate.php" /></label></p>';
+		echo '<p><label><strong>Reset URL</strong><br /><input type="url" name="whmcs_reset_url" style="width:100%;" value="' . esc_attr((string) $conf['reset_url']) . '" placeholder="https://whmcs.example.com/modules/addons/guardian_licensing/api/reset.php" /></label></p>';
+		echo '<p><label><strong>License ID</strong><br /><input type="text" name="whmcs_license_id" style="width:100%;" value="' . esc_attr((string) $conf['license_id']) . '" placeholder="GL-..." /></label></p>';
+		echo '<p><label><strong>API Secret (consigliato)</strong><br /><input type="password" name="whmcs_api_secret" style="width:100%;" value="' . esc_attr((string) $conf['api_secret']) . '" /></label></p>';
+		echo '</div>';
+
+		echo '<p style="max-width:1100px;"><strong>' . esc_html__('Token offline', 'guardian') . '</strong><br />';
+		echo '<textarea name="license_token" rows="4" style="width: 100%;" placeholder="Incolla qui la licenza (token)">' . esc_textarea($this->license->get_token()) . '</textarea></p>';
+
+		submit_button(__('Salva impostazioni licenza', 'guardian'));
 		echo '</form>';
+
+		if ($mode === 'whmcs') {
+			echo '<p style="max-width:1100px;">';
+			echo '<a class="button" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_fetch_license'), 'guardian_fetch_license')) . '">' . esc_html__('Forza refresh licenza da WHMCS', 'guardian') . '</a> ';
+			echo '<a class="button" onclick="return confirm(\'Reset dominio su WHMCS per questa licenza?\\nDopo il reset, WHMCS legherà la licenza al nuovo dominio al prossimo validate.\');" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_reset_domain'), 'guardian_reset_domain')) . '">' . esc_html__('Reset dominio (WHMCS)', 'guardian') . '</a>';
+			echo '</p>';
+		}
 
 		if (!$licensed) {
 			echo '<hr />';
@@ -366,6 +434,8 @@ final class Admin {
 			'settings_saved' => ['success', __('Impostazioni salvate.', 'guardian')],
 			'license_ok' => ['success', __('Licenza valida.', 'guardian')],
 			'license_fail' => ['error', __('Licenza non valida.', 'guardian')],
+			'domain_reset_ok' => ['success', __('Dominio resettato (WHMCS).', 'guardian')],
+			'domain_reset_fail' => ['error', __('Reset dominio non riuscito.', 'guardian')],
 		];
 		if ($notice && isset($map[$notice])) {
 			[$cls, $msg] = $map[$notice];

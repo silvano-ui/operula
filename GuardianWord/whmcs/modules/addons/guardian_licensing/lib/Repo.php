@@ -109,6 +109,52 @@ final class Repo
 		];
 	}
 
+	public static function listLicenses(int $limit = 50): array
+	{
+		self::ensureSchema();
+		$rows = Capsule::table('mod_guardian_licenses')
+			->orderBy('updated_at', 'desc')
+			->limit(max(1, min(500, $limit)))
+			->get(['service_id', 'license_id', 'domain', 'status', 'expires_at', 'updated_at']);
+
+		$out = [];
+		foreach ($rows as $r) {
+			$out[] = [
+				'service_id' => (int) $r->service_id,
+				'license_id' => (string) $r->license_id,
+				'domain' => (string) $r->domain,
+				'status' => (string) $r->status,
+				'expires_at' => (int) $r->expires_at,
+				'updated_at' => (int) $r->updated_at,
+			];
+		}
+		return $out;
+	}
+
+	public static function clearDomain(string $licenseId): void
+	{
+		self::ensureSchema();
+		Capsule::table('mod_guardian_licenses')
+			->where('license_id', $licenseId)
+			->update([
+				'domain' => '',
+				'updated_at' => time(),
+			]);
+	}
+
+	public static function reissueTokenByLicenseId(string $licenseId): void
+	{
+		self::ensureSchema();
+		$row = Capsule::table('mod_guardian_licenses')->where('license_id', $licenseId)->first(['service_id']);
+		if (!$row) {
+			return;
+		}
+		$svc = ServiceResolver::serviceById((int) $row->service_id);
+		if ($svc) {
+			self::getOrIssueForService($svc);
+		}
+	}
+
 	public static function updateDomain(string $licenseId, string $domain): void
 	{
 		self::ensureSchema();
@@ -166,6 +212,15 @@ final class Repo
 		}
 		$ts = strtotime($nextDue . ' 23:59:59 UTC');
 		return $ts ? (int) $ts : 0;
+	}
+
+	public static function getSetting(string $setting, string $default = ''): string
+	{
+		$val = Capsule::table('tbladdonmodules')
+			->where('module', 'guardian_licensing')
+			->where('setting', $setting)
+			->value('value');
+		return is_string($val) ? $val : $default;
 	}
 }
 

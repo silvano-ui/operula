@@ -51,15 +51,36 @@ try {
 		exit;
 	}
 
-	// Update domain if empty or changed (policy: lock to first domain unless admin changes?).
-	// Here: allow updating if empty; if different, return mismatch.
+	$policy = Repo::getSetting('domainPolicy', 'lock_first');
+	$policy = is_string($policy) ? $policy : 'lock_first';
+
+	// Domain binding rules.
 	if ($row['domain'] === '') {
 		Repo::updateDomain($licenseId, $domain);
 		$row['domain'] = $domain;
 	} elseif ($row['domain'] !== $domain) {
-		http_response_code(409);
-		echo json_encode(['ok' => false, 'status' => 'invalid', 'message' => 'domain mismatch', 'licensed_domain' => $row['domain']]);
-		exit;
+		if ($policy === 'allow_change') {
+			Repo::updateDomain($licenseId, $domain);
+			$row['domain'] = $domain;
+		} elseif ($policy === 'reset_required') {
+			http_response_code(409);
+			echo json_encode([
+				'ok' => false,
+				'status' => 'domain_reset_required',
+				'message' => 'domain mismatch; reset required',
+				'licensed_domain' => $row['domain'],
+			]);
+			exit;
+		} else { // lock_first
+			http_response_code(409);
+			echo json_encode([
+				'ok' => false,
+				'status' => 'domain_mismatch',
+				'message' => 'domain mismatch',
+				'licensed_domain' => $row['domain'],
+			]);
+			exit;
+		}
 	}
 
 	// Refresh from WHMCS service (renew/upgrade changes) on each validate.

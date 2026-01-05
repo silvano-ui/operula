@@ -19,6 +19,8 @@ namespace Guardian;
 final class License {
 	private const OPTION_LICENSE_TOKEN = 'guardian_license_token';
 	private const OPTION_LICENSE_CACHE = 'guardian_license_cache';
+	private const OPTION_LICENSE_MODE  = 'guardian_license_mode'; // offline|whmcs
+	private const OPTION_WHMCS_CONF    = 'guardian_whmcs_conf';
 
 	/**
 	 * Put your Ed25519 public key here (base64).
@@ -42,12 +44,58 @@ final class License {
 		delete_option(self::OPTION_LICENSE_CACHE);
 	}
 
+	public function get_mode(): string {
+		$m = get_option(self::OPTION_LICENSE_MODE);
+		$m = is_string($m) ? $m : 'offline';
+		return in_array($m, ['offline', 'whmcs'], true) ? $m : 'offline';
+	}
+
+	public function set_mode(string $mode): void {
+		$mode = in_array($mode, ['offline', 'whmcs'], true) ? $mode : 'offline';
+		update_option(self::OPTION_LICENSE_MODE, $mode, false);
+		delete_option(self::OPTION_LICENSE_CACHE);
+	}
+
+	public function get_whmcs_conf(): array {
+		$conf = get_option(self::OPTION_WHMCS_CONF);
+		$conf = is_array($conf) ? $conf : [];
+		return array_merge([
+			'validate_url' => '',
+			'reset_url' => '',
+			'license_id' => '',
+			'api_secret' => '',
+			'cache_ttl' => 3600,
+		], $conf);
+	}
+
+	public function save_whmcs_conf(array $conf): void {
+		$cur = $this->get_whmcs_conf();
+		$new = array_merge($cur, $conf);
+		update_option(self::OPTION_WHMCS_CONF, $new, false);
+		delete_option(self::OPTION_LICENSE_CACHE);
+	}
+
 	public function status(): array {
+		$mode = $this->get_mode();
+		if ($mode === 'whmcs') {
+			// Best-effort: usa cache; se scaduta prova fetch.
+			$cached = $this->get_cached_status();
+			if ($cached && !empty($cached['ok'])) {
+				return $cached;
+			}
+			$fresh = $this->refresh_from_whmcs_if_needed(true);
+			if ($fresh) {
+				return $fresh;
+			}
+			// fallback: se esiste token locale, verifica offline
+		}
+
 		$token = $this->get_token();
 		if ($token === '') {
 			return ['ok' => false, 'code' => 'missing', 'message' => __('Licenza mancante.', 'guardian')];
 		}
 		$check = $this->verify_offline_token($token);
+		$this->set_cached_status($check);
 		return $check;
 	}
 
@@ -71,6 +119,116 @@ final class License {
 		}
 		$data = json_decode($payloadJson, true);
 		return is_array($data) ? $data : null;
+	}
+
+	/**
+	 * Refresh token via WHMCS validate endpoint.
+	 *
+	 * @param bool $force se true forza chiamata (no cache)
+	 * @return array|null status array
+	 */
+	public function refresh_from_whmcs_if_needed(bool $force = false): ?array {
+		$conf = $this->get_whmcs_conf();
+		$url = (string) ($conf['validate_url'] ?? '');
+		$licenseId = (string) ($conf['license_id'] ?? '');
+		$ttl = (int) ($conf['cache_ttl'] ?? 3600);
+		if ($ttl <= 60) {
+			$ttl = 3600;
+		}
+
+		if (!$force) {
+			$cached = $this->get_cached_status();
+			if ($cached && isset($cached['_cached_at']) && (time() - (int) $cached['_cached_at']) < $ttl) {
+				return $cached;
+			}
+		}
+
+		if ($url === '' || $licenseId === '') {
+			$st = ['ok' => false, 'code' => 'whmcs_missing', 'message' => __('Config WHMCS incompleta (validate_url/license_id).', 'guardian')];
+			$this->set_cached_status($st);
+			return $st;
+		}
+
+		$domain = $this->site_host();
+		$body = [
+			'license_id' => $licenseId,
+			'domain' => $domain,
+		];
+		$apiSecret = (string) ($conf['api_secret'] ?? '');
+		if ($apiSecret !== '') {
+			$body['api_secret'] = $apiSecret;
+		}
+
+		$res = wp_remote_post($url, [
+			'timeout' => 12,
+			'headers' => ['Accept' => 'application/json'],
+			'body' => $body,
+		]);
+
+		if (is_wp_error($res)) {
+			$st = ['ok' => false, 'code' => 'whmcs_http', 'message' => __('Errore chiamata WHMCS.', 'guardian') . ' ' . $res->get_error_message()];
+			$this->set_cached_status($st);
+			return $st;
+		}
+
+		$code = (int) wp_remote_retrieve_response_code($res);
+		$raw = (string) wp_remote_retrieve_body($res);
+		$data = json_decode($raw, true);
+		if (!is_array($data)) {
+			$st = ['ok' => false, 'code' => 'whmcs_parse', 'message' => __('Risposta WHMCS non valida.', 'guardian')];
+			$this->set_cached_status($st);
+			return $st;
+		}
+
+		if ($code >= 400 || empty($data['ok'])) {
+			$msg = isset($data['message']) && is_string($data['message']) ? $data['message'] : __('Licenza WHMCS non valida.', 'guardian');
+			$st = ['ok' => false, 'code' => 'whmcs_denied', 'message' => $msg, 'whmcs' => $data];
+			$this->set_cached_status($st);
+			return $st;
+		}
+
+		$token = isset($data['token']) && is_string($data['token']) ? trim($data['token']) : '';
+		if ($token === '') {
+			$st = ['ok' => false, 'code' => 'whmcs_no_token', 'message' => __('WHMCS non ha fornito un token.', 'guardian')];
+			$this->set_cached_status($st);
+			return $st;
+		}
+
+		// Salva token locale e verifica firma offline (difesa in profondità).
+		$this->save_token($token);
+		$check = $this->verify_offline_token($token);
+		$check['whmcs'] = $data;
+		$this->set_cached_status($check);
+		return $check;
+	}
+
+	public function request_domain_reset(): array {
+		$conf = $this->get_whmcs_conf();
+		$url = (string) ($conf['reset_url'] ?? '');
+		$licenseId = (string) ($conf['license_id'] ?? '');
+		$apiSecret = (string) ($conf['api_secret'] ?? '');
+		if ($url === '' || $licenseId === '') {
+			return ['ok' => false, 'code' => 'whmcs_missing', 'message' => __('Config WHMCS incompleta (reset_url/license_id).', 'guardian')];
+		}
+		$body = ['license_id' => $licenseId];
+		if ($apiSecret !== '') {
+			$body['api_secret'] = $apiSecret;
+		}
+		$res = wp_remote_post($url, [
+			'timeout' => 12,
+			'headers' => ['Accept' => 'application/json'],
+			'body' => $body,
+		]);
+		if (is_wp_error($res)) {
+			return ['ok' => false, 'code' => 'whmcs_http', 'message' => $res->get_error_message()];
+		}
+		$raw = (string) wp_remote_retrieve_body($res);
+		$data = json_decode($raw, true);
+		if (!is_array($data) || empty($data['ok'])) {
+			$msg = is_array($data) && isset($data['message']) && is_string($data['message']) ? $data['message'] : __('Reset dominio non riuscito.', 'guardian');
+			return ['ok' => false, 'code' => 'whmcs_reset_fail', 'message' => $msg, 'whmcs' => $data];
+		}
+		return ['ok' => true, 'code' => 'ok', 'message' => __('Dominio resettato su WHMCS.', 'guardian')];
 	}
 
 	private function verify_offline_token(string $token): array {
@@ -153,6 +311,16 @@ final class License {
 			'message' => __('Licenza valida.', 'guardian'),
 			'payload' => $data,
 		];
+	}
+
+	private function get_cached_status(): ?array {
+		$c = get_option(self::OPTION_LICENSE_CACHE);
+		return is_array($c) ? $c : null;
+	}
+
+	private function set_cached_status(array $st): void {
+		$st['_cached_at'] = time();
+		update_option(self::OPTION_LICENSE_CACHE, $st, false);
 	}
 
 	private function site_host(): string {

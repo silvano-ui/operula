@@ -4,6 +4,7 @@ Questa cartella contiene:
 
 - `guardian/`: plugin WordPress “Guardian”
 - `tools/license_gen.php`: generatore offline di licenze (token firmati Ed25519)
+- `whmcs/`: addon module WHMCS per gestione licenze/token + API
 
 ### Flusso licenze (offline)
 
@@ -25,7 +26,16 @@ php tools/license_gen.php gen-token --private-key-b64 "<PRIVATE_KEY_B64>" --doma
 
 4) In WordPress: **Bacheca > Guardian > Licenza** → incolla il token.
 
-### Nota WHMCS
+### Flusso licenze con WHMCS (consigliato)
 
-Se vuoi integrare WHMCS Licensing Addon, dimmelo e ti preparo un “mode” alternativo di verifica remota (endpoint WHMCS + caching), mantenendo comunque un fallback offline.
+1) Installa il modulo WHMCS in `whmcs/` (vedi `whmcs/README.md`)
+2) In WHMCS genera le chiavi e copia `PUBLIC_KEY_B64` nel plugin (`License::PUBLIC_KEY_B64`)
+3) In WordPress: **Bacheca > Guardian > Licenza**
+   - seleziona **WHMCS (auto-recupero)**
+   - imposta:
+     - Validate URL: `.../modules/addons/guardian_licensing/api/validate.php`
+     - Reset URL: `.../modules/addons/guardian_licensing/api/reset.php`
+     - License ID (es. `GL-...`)
+     - API Secret (se impostato nel modulo)
+4) Guardian farà refresh automatico (cache + job hourly) e userà sempre token firmati.
 
