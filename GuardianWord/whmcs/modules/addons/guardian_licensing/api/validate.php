@@ -19,6 +19,7 @@ use WHMCS\Database\Capsule;
 require_once __DIR__ . '/../lib/Signer.php';
 require_once __DIR__ . '/../lib/Repo.php';
 require_once __DIR__ . '/../lib/ServiceResolver.php';
+require_once __DIR__ . '/../lib/Security.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -31,10 +32,19 @@ try {
 	$ts = isset($_POST['ts']) ? (int) $_POST['ts'] : 0;
 	$nonce = isset($_POST['nonce']) ? (string) $_POST['nonce'] : '';
 	$sig = isset($_POST['sig']) ? (string) $_POST['sig'] : '';
+	$installId = isset($_POST['install_id']) ? (string) $_POST['install_id'] : '';
 
 	if ($licenseId === '' || $domain === '') {
 		http_response_code(400);
 		echo json_encode(['ok' => false, 'status' => 'invalid', 'message' => 'license_id and domain required']);
+		exit;
+	}
+
+	$ip = Security::clientIp();
+	$allowlist = Repo::getSetting('ipAllowlist', '');
+	if (!Security::ipAllowed($ip, $allowlist)) {
+		http_response_code(403);
+		echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'ip not allowed']);
 		exit;
 	}
 
@@ -53,7 +63,7 @@ try {
 			$rate = 60;
 		}
 
-		$ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+		$ip = Security::clientIp();
 		$rlKey = 'validate:' . $licenseId . ':' . $ip;
 		if (!Repo::rateLimitAllow($rlKey, 60, $rate)) {
 			http_response_code(429);
@@ -75,8 +85,9 @@ try {
 			}
 			$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
 			$path = is_string($path) ? $path : '';
-			$msg = "POST\n{$path}\n{$licenseId}\n{$domain}\n{$ts}\n{$nonce}";
-			$expect = rtrim(strtr(base64_encode(hash_hmac('sha256', $msg, $apiSecret, true)), '+/', '-_'), '=');
+			$installId = trim($installId);
+			$msg = Security::message('POST', $path, $licenseId, $domain, $installId, $ts, $nonce);
+			$expect = Security::b64url(hash_hmac('sha256', $msg, $apiSecret, true));
 			if (!hash_equals($expect, $sig)) {
 				http_response_code(403);
 				echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'bad signature']);
@@ -130,6 +141,30 @@ try {
 				'status' => 'domain_mismatch',
 				'message' => 'domain mismatch',
 				'licensed_domain' => $row['domain'],
+			]);
+			exit;
+		}
+	}
+
+	// Install binding rules (optional/enforced).
+	$enforceInstall = Repo::getSetting('enforceInstallBinding', 'on');
+	$enforceInstall = strtolower((string) $enforceInstall) !== '' && strtolower((string) $enforceInstall) !== 'off';
+	$installId = trim((string) $installId);
+	if ($enforceInstall) {
+		if ($installId === '') {
+			http_response_code(400);
+			echo json_encode(['ok' => false, 'status' => 'invalid', 'message' => 'install_id required']);
+			exit;
+		}
+		if (($row['install_id'] ?? '') === '') {
+			Repo::updateInstallId($licenseId, $installId);
+			$row['install_id'] = $installId;
+		} elseif (($row['install_id'] ?? '') !== $installId) {
+			http_response_code(409);
+			echo json_encode([
+				'ok' => false,
+				'status' => 'install_reset_required',
+				'message' => 'install mismatch; reset required',
 			]);
 			exit;
 		}

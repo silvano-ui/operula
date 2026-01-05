@@ -34,6 +34,19 @@ function guardian_licensing_config()
 				"Default" => "on",
 				"Description" => "Se ON: richiede ts/nonce/sig (HMAC-SHA256) per validate/reset quando apiSecret è impostato.",
 			],
+			"enforceInstallBinding" => [
+				"FriendlyName" => "Enforce install binding (install_id)",
+				"Type" => "yesno",
+				"Default" => "on",
+				"Description" => "Se ON: l'API richiede install_id e la licenza viene legata alla prima installazione (reset necessario per cambiare).",
+			],
+			"ipAllowlist" => [
+				"FriendlyName" => "IP allowlist (API)",
+				"Type" => "text",
+				"Size" => "100",
+				"Default" => "",
+				"Description" => "Comma-separated IP/CIDR (es: 203.0.113.10, 198.51.100.0/24). Vuoto = allow all.",
+			],
 			"maxClockSkewSeconds" => [
 				"FriendlyName" => "Max clock skew (seconds)",
 				"Type" => "text",
@@ -175,13 +188,14 @@ function guardian_licensing_output($vars)
 	}
 
 	echo '<table class="table table-striped" style="max-width: 1400px;">';
-	echo '<thead><tr><th>License ID</th><th>Service ID</th><th>Domain</th><th>Status</th><th>Expires</th><th>Azioni</th></tr></thead><tbody>';
+	echo '<thead><tr><th>License ID</th><th>Service ID</th><th>Domain</th><th>Install ID</th><th>Status</th><th>Expires</th><th>Azioni</th></tr></thead><tbody>';
 	foreach ($rows as $r) {
 		$exp = (int) ($r['expires_at'] ?? 0);
 		echo '<tr>';
 		echo '<td><code>' . htmlspecialchars((string) $r['license_id']) . '</code></td>';
 		echo '<td>' . htmlspecialchars((string) $r['service_id']) . '</td>';
 		echo '<td>' . htmlspecialchars((string) $r['domain']) . '</td>';
+		echo '<td><small>' . htmlspecialchars((string) ($r['install_id'] ?? '')) . '</small></td>';
 		echo '<td>' . htmlspecialchars((string) $r['status']) . '</td>';
 		echo '<td>' . ($exp > 0 ? gmdate('Y-m-d', $exp) : 'never') . '</td>';
 		echo '<td>';

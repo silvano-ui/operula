@@ -10,6 +10,7 @@ final class Repo
 			// Ensure auxiliary tables.
 			self::ensureNonceSchema();
 			self::ensureRateLimitSchema();
+			self::ensureLicenseColumns();
 			return;
 		}
 		Capsule::schema()->create('mod_guardian_licenses', function ($table) {
@@ -17,6 +18,7 @@ final class Repo
 			$table->integer('service_id')->unsigned()->unique();
 			$table->string('license_id', 64)->unique();
 			$table->string('domain', 255)->default('');
+			$table->string('install_id', 64)->default('');
 			$table->text('token')->nullable();
 			$table->string('status', 32)->default('active'); // active|expired|suspended|terminated
 			$table->integer('issued_at')->unsigned()->default(0);
@@ -26,6 +28,16 @@ final class Repo
 
 		self::ensureNonceSchema();
 		self::ensureRateLimitSchema();
+	}
+
+	private static function ensureLicenseColumns(): void
+	{
+		// Lightweight migration for existing installs.
+		if (!Capsule::schema()->hasColumn('mod_guardian_licenses', 'install_id')) {
+			Capsule::schema()->table('mod_guardian_licenses', function ($table) {
+				$table->string('install_id', 64)->default('');
+			});
+		}
 	}
 
 	private static function ensureNonceSchema(): void
@@ -201,6 +213,7 @@ final class Repo
 			'service_id' => (int) $row->service_id,
 			'license_id' => (string) $row->license_id,
 			'domain' => (string) $row->domain,
+			'install_id' => isset($row->install_id) ? (string) $row->install_id : '',
 			'token' => is_string($row->token) ? $row->token : null,
 			'status' => (string) $row->status,
 			'issued_at' => (int) $row->issued_at,
@@ -214,7 +227,7 @@ final class Repo
 		$rows = Capsule::table('mod_guardian_licenses')
 			->orderBy('updated_at', 'desc')
 			->limit(max(1, min(500, $limit)))
-			->get(['service_id', 'license_id', 'domain', 'status', 'expires_at', 'updated_at']);
+			->get(['service_id', 'license_id', 'domain', 'install_id', 'status', 'expires_at', 'updated_at']);
 
 		$out = [];
 		foreach ($rows as $r) {
@@ -222,6 +235,7 @@ final class Repo
 				'service_id' => (int) $r->service_id,
 				'license_id' => (string) $r->license_id,
 				'domain' => (string) $r->domain,
+				'install_id' => isset($r->install_id) ? (string) $r->install_id : '',
 				'status' => (string) $r->status,
 				'expires_at' => (int) $r->expires_at,
 				'updated_at' => (int) $r->updated_at,
@@ -237,6 +251,29 @@ final class Repo
 			->where('license_id', $licenseId)
 			->update([
 				'domain' => '',
+				'install_id' => '',
+				'updated_at' => time(),
+			]);
+	}
+
+	public static function updateInstallId(string $licenseId, string $installId): void
+	{
+		self::ensureSchema();
+		Capsule::table('mod_guardian_licenses')
+			->where('license_id', $licenseId)
+			->update([
+				'install_id' => trim($installId),
+				'updated_at' => time(),
+			]);
+	}
+
+	public static function clearInstallId(string $licenseId): void
+	{
+		self::ensureSchema();
+		Capsule::table('mod_guardian_licenses')
+			->where('license_id', $licenseId)
+			->update([
+				'install_id' => '',
 				'updated_at' => time(),
 			]);
 	}

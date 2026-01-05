@@ -53,15 +53,17 @@ Se `apiSecret` è configurato nell’addon e `Enforce signed requests` è ON (de
 Stringa firmata:
 
 - validate:
-  - `POST\n{path}\n{license_id}\n{domain}\n{ts}\n{nonce}`
+  - `POST\n{path}\n{license_id}\n{domain}\n{install_id}\n{ts}\n{nonce}`
 - reset:
-  - `POST\n{path}\n{license_id}\n\n{ts}\n{nonce}`
+  - `POST\n{path}\n{license_id}\n{reset_kind}\n\n{ts}\n{nonce}`
 
 `sig = base64url(HMAC_SHA256(apiSecret, message))`
 
 Protezione aggiuntiva:
 - **anti-replay**: i nonce vengono memorizzati per una finestra (skew+60s)
 - **rate limit**: per `license_id + IP` (configurabile)
+- **IP allowlist**: se configurata, blocca tutto il resto
+- **install binding**: se abilitato, l’API richiede `install_id` e lo lega alla prima installazione (reset necessario per cambiare)
 
 ### Requisito consigliato
 

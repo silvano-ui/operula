@@ -15,6 +15,7 @@ require_once dirname(__DIR__, 4) . '/init.php';
 
 require_once __DIR__ . '/../lib/Signer.php';
 require_once __DIR__ . '/../lib/Repo.php';
+require_once __DIR__ . '/../lib/Security.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -25,10 +26,19 @@ try {
 	$ts = isset($_POST['ts']) ? (int) $_POST['ts'] : 0;
 	$nonce = isset($_POST['nonce']) ? (string) $_POST['nonce'] : '';
 	$sig = isset($_POST['sig']) ? (string) $_POST['sig'] : '';
+	$resetKind = isset($_POST['reset_kind']) ? (string) $_POST['reset_kind'] : 'domain';
 
 	if ($licenseId === '') {
 		http_response_code(400);
 		echo json_encode(['ok' => false, 'status' => 'invalid', 'message' => 'license_id required']);
+		exit;
+	}
+
+	$ip = Security::clientIp();
+	$allowlist = Repo::getSetting('ipAllowlist', '');
+	if (!Security::ipAllowed($ip, $allowlist)) {
+		http_response_code(403);
+		echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'ip not allowed']);
 		exit;
 	}
 
@@ -47,7 +57,7 @@ try {
 			$rate = 30;
 		}
 
-		$ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+		$ip = Security::clientIp();
 		$rlKey = 'reset:' . $licenseId . ':' . $ip;
 		if (!Repo::rateLimitAllow($rlKey, 60, $rate)) {
 			http_response_code(429);
@@ -68,8 +78,9 @@ try {
 			}
 			$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
 			$path = is_string($path) ? $path : '';
-			$msg = "POST\n{$path}\n{$licenseId}\n\n{$ts}\n{$nonce}";
-			$expect = rtrim(strtr(base64_encode(hash_hmac('sha256', $msg, $apiSecret, true)), '+/', '-_'), '=');
+			$rk = strtolower(trim((string) $resetKind));
+			$msg = Security::message('POST', $path, $licenseId, $rk, '', $ts, $nonce);
+			$expect = Security::b64url(hash_hmac('sha256', $msg, $apiSecret, true));
 			if (!hash_equals($expect, $sig)) {
 				http_response_code(403);
 				echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'bad signature']);
@@ -96,6 +107,17 @@ try {
 		exit;
 	}
 
+	$resetKind = strtolower(trim($resetKind));
+	if ($resetKind === 'all') {
+		Repo::clearDomain($licenseId); // clears domain + install_id
+		echo json_encode(['ok' => true, 'status' => 'ok', 'message' => 'domain and install binding cleared']);
+		exit;
+	}
+	if ($resetKind === 'install') {
+		Repo::clearInstallId($licenseId);
+		echo json_encode(['ok' => true, 'status' => 'ok', 'message' => 'install binding cleared']);
+		exit;
+	}
 	Repo::clearDomain($licenseId);
 	echo json_encode(['ok' => true, 'status' => 'ok', 'message' => 'domain cleared']);
 } catch (\Throwable $e) {

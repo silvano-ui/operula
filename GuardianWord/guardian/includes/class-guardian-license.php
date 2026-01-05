@@ -64,6 +64,7 @@ final class License {
 			'reset_url' => '',
 			'license_id' => '',
 			'api_secret' => '',
+			'install_id' => '',
 			'cache_ttl' => 3600,
 		], $conf);
 	}
@@ -73,6 +74,24 @@ final class License {
 		$new = array_merge($cur, $conf);
 		update_option(self::OPTION_WHMCS_CONF, $new, false);
 		delete_option(self::OPTION_LICENSE_CACHE);
+	}
+
+	public function get_install_id(): string {
+		$conf = $this->get_whmcs_conf();
+		$id = isset($conf['install_id']) && is_string($conf['install_id']) ? trim($conf['install_id']) : '';
+		if ($id !== '') {
+			return $id;
+		}
+		// Autogenera e salva.
+		$id = 'GW-' . wp_generate_password(22, false, false);
+		$this->save_whmcs_conf(['install_id' => $id]);
+		return $id;
+	}
+
+	public function rotate_install_id(): string {
+		$id = 'GW-' . wp_generate_password(22, false, false);
+		$this->save_whmcs_conf(['install_id' => $id]);
+		return $id;
 	}
 
 	public function status(): array {
@@ -152,10 +171,12 @@ final class License {
 		$domain = $this->site_host();
 		$ts = time();
 		$nonce = $this->new_nonce();
-		$sig = $this->sign_whmcs_request('POST', $url, $licenseId, $domain, $ts, $nonce);
+		$installId = $this->get_install_id();
+		$sig = $this->sign_whmcs_request('POST', $url, $licenseId, $domain, $installId, $ts, $nonce);
 		$body = [
 			'license_id' => $licenseId,
 			'domain' => $domain,
+			'install_id' => $installId,
 			'ts' => $ts,
 			'nonce' => $nonce,
 			'sig' => $sig,
@@ -220,9 +241,10 @@ final class License {
 		}
 		$ts = time();
 		$nonce = $this->new_nonce();
-		$sig = $this->sign_whmcs_request('POST', $url, $licenseId, '', $ts, $nonce);
+		$sig = $this->sign_whmcs_request('POST', $url, $licenseId, 'domain', '', $ts, $nonce);
 		$body = [
 			'license_id' => $licenseId,
+			'reset_kind' => 'domain',
 			'ts' => $ts,
 			'nonce' => $nonce,
 			'sig' => $sig,
@@ -248,6 +270,46 @@ final class License {
 			return ['ok' => false, 'code' => 'whmcs_reset_fail', 'message' => $msg, 'whmcs' => $data];
 		}
 		return ['ok' => true, 'code' => 'ok', 'message' => __('Dominio resettato su WHMCS.', 'guardian')];
+	}
+
+	public function request_install_reset(): array {
+		$conf = $this->get_whmcs_conf();
+		$url = (string) ($conf['reset_url'] ?? '');
+		$licenseId = (string) ($conf['license_id'] ?? '');
+		if ($url === '' || $licenseId === '') {
+			return ['ok' => false, 'code' => 'whmcs_missing', 'message' => __('Config WHMCS incompleta (reset_url/license_id).', 'guardian')];
+		}
+		$ts = time();
+		$nonce = $this->new_nonce();
+		$sig = $this->sign_whmcs_request('POST', $url, $licenseId, 'install', '', $ts, $nonce);
+		$body = [
+			'license_id' => $licenseId,
+			'reset_kind' => 'install',
+			'ts' => $ts,
+			'nonce' => $nonce,
+			'sig' => $sig,
+		];
+		if ($sig === '') {
+			$apiSecret = (string) ($conf['api_secret'] ?? '');
+			if ($apiSecret !== '') {
+				$body['api_secret'] = $apiSecret;
+			}
+		}
+		$res = wp_remote_post($url, [
+			'timeout' => 12,
+			'headers' => ['Accept' => 'application/json'],
+			'body' => $body,
+		]);
+		if (is_wp_error($res)) {
+			return ['ok' => false, 'code' => 'whmcs_http', 'message' => $res->get_error_message()];
+		}
+		$raw = (string) wp_remote_retrieve_body($res);
+		$data = json_decode($raw, true);
+		if (!is_array($data) || empty($data['ok'])) {
+			$msg = is_array($data) && isset($data['message']) && is_string($data['message']) ? $data['message'] : __('Reset install non riuscito.', 'guardian');
+			return ['ok' => false, 'code' => 'whmcs_reset_fail', 'message' => $msg, 'whmcs' => $data];
+		}
+		return ['ok' => true, 'code' => 'ok', 'message' => __('Install binding resettato su WHMCS.', 'guardian')];
 	}
 
 	private function verify_offline_token(string $token): array {
@@ -373,7 +435,7 @@ final class License {
 	 * Message format:
 	 * POST\n/path\n{licenseId}\n{domain}\n{ts}\n{nonce}
 	 */
-	private function sign_whmcs_request(string $method, string $url, string $licenseId, string $domain, int $ts, string $nonce): string {
+	private function sign_whmcs_request(string $method, string $url, string $licenseId, string $domain, string $installId, int $ts, string $nonce): string {
 		$conf = $this->get_whmcs_conf();
 		$secret = (string) ($conf['api_secret'] ?? '');
 		if ($secret === '') {
@@ -383,7 +445,8 @@ final class License {
 		$path = parse_url($url, PHP_URL_PATH);
 		$path = is_string($path) ? $path : '';
 		$domain = (string) $domain;
-		$msg = strtoupper($method) . "\n" . $path . "\n" . $licenseId . "\n" . $domain . "\n" . $ts . "\n" . $nonce;
+		$installId = (string) $installId;
+		$msg = strtoupper($method) . "\n" . $path . "\n" . $licenseId . "\n" . $domain . "\n" . $installId . "\n" . $ts . "\n" . $nonce;
 		$raw = hash_hmac('sha256', $msg, $secret, true);
 		return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
 	}

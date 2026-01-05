@@ -18,6 +18,8 @@ final class Admin {
 		add_action('admin_post_guardian_save_license', [$this, 'handle_save_license']);
 		add_action('admin_post_guardian_fetch_license', [$this, 'handle_fetch_license']);
 		add_action('admin_post_guardian_reset_domain', [$this, 'handle_reset_domain']);
+		add_action('admin_post_guardian_reset_install', [$this, 'handle_reset_install']);
+		add_action('admin_post_guardian_rotate_install_id', [$this, 'handle_rotate_install_id']);
 		add_action('admin_post_guardian_create_snapshot', [$this, 'handle_create_snapshot']);
 		add_action('admin_post_guardian_rollback_last', [$this, 'handle_rollback_last']);
 		add_action('admin_post_guardian_restore_full_last', [$this, 'handle_restore_full_last']);
@@ -170,6 +172,28 @@ final class Admin {
 		exit;
 	}
 
+	public function handle_reset_install(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_reset_install');
+
+		$r = $this->license->request_install_reset();
+		wp_safe_redirect(add_query_arg(['guardian_notice' => !empty($r['ok']) ? 'install_reset_ok' : 'install_reset_fail'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
+	public function handle_rotate_install_id(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_rotate_install_id');
+
+		$this->license->rotate_install_id();
+		wp_safe_redirect(add_query_arg(['guardian_notice' => 'install_id_rotated'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
 	public function render_page(): void {
 		if (!current_user_can('manage_options')) {
 			wp_die(__('Non autorizzato.', 'guardian'));
@@ -189,6 +213,8 @@ final class Admin {
 			if ($wst === 'domain_reset_required') {
 				// Evidenzia azione consigliata.
 				echo '<div class="notice notice-warning"><p><strong>Guardian</strong>: ' . esc_html__('Dominio cambiato: serve reset dominio su WHMCS.', 'guardian') . '</p></div>';
+			} elseif ($wst === 'install_reset_required') {
+				echo '<div class="notice notice-warning"><p><strong>Guardian</strong>: ' . esc_html__('Installazione diversa: serve reset install binding su WHMCS.', 'guardian') . '</p></div>';
 			}
 		}
 
@@ -225,6 +251,7 @@ final class Admin {
 		echo '<p><label><strong>Reset URL</strong><br /><input type="url" name="whmcs_reset_url" style="width:100%;" value="' . esc_attr((string) $conf['reset_url']) . '" placeholder="https://whmcs.example.com/modules/addons/guardian_licensing/api/reset.php" /></label></p>';
 		echo '<p><label><strong>License ID</strong><br /><input type="text" name="whmcs_license_id" style="width:100%;" value="' . esc_attr((string) $conf['license_id']) . '" placeholder="GL-..." /></label></p>';
 		echo '<p><label><strong>API Secret (consigliato)</strong><br /><input type="password" name="whmcs_api_secret" style="width:100%;" value="' . esc_attr((string) $conf['api_secret']) . '" /></label></p>';
+		echo '<p><label><strong>Install ID (auto)</strong><br /><input type="text" readonly style="width:100%;" value="' . esc_attr($this->license->get_install_id()) . '" /></label></p>';
 		echo '</div>';
 
 		echo '<p style="max-width:1100px;"><strong>' . esc_html__('Token offline', 'guardian') . '</strong><br />';
@@ -237,6 +264,8 @@ final class Admin {
 			echo '<p style="max-width:1100px;">';
 			echo '<a class="button" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_fetch_license'), 'guardian_fetch_license')) . '">' . esc_html__('Forza refresh licenza da WHMCS', 'guardian') . '</a> ';
 			echo '<a class="button" onclick="return confirm(\'Reset dominio su WHMCS per questa licenza?\\nDopo il reset, WHMCS legherà la licenza al nuovo dominio al prossimo validate.\');" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_reset_domain'), 'guardian_reset_domain')) . '">' . esc_html__('Reset dominio (WHMCS)', 'guardian') . '</a>';
+			echo ' <a class="button" onclick="return confirm(\'Reset install binding su WHMCS?\\nServe se sposti il sito o rigeneri Install ID.\');" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_reset_install'), 'guardian_reset_install')) . '">' . esc_html__('Reset install binding (WHMCS)', 'guardian') . '</a>';
+			echo ' <a class="button" onclick="return confirm(\'Rigenerare Install ID locale?\\nDovrai anche resettare install binding su WHMCS.\');" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_rotate_install_id'), 'guardian_rotate_install_id')) . '">' . esc_html__('Rigenera Install ID', 'guardian') . '</a>';
 			echo '</p>';
 		}
 
@@ -443,6 +472,9 @@ final class Admin {
 			'license_fail' => ['error', __('Licenza non valida.', 'guardian')],
 			'domain_reset_ok' => ['success', __('Dominio resettato (WHMCS).', 'guardian')],
 			'domain_reset_fail' => ['error', __('Reset dominio non riuscito.', 'guardian')],
+			'install_reset_ok' => ['success', __('Install binding resettato (WHMCS).', 'guardian')],
+			'install_reset_fail' => ['error', __('Reset install binding non riuscito.', 'guardian')],
+			'install_id_rotated' => ['success', __('Install ID rigenerato.', 'guardian')],
 		];
 		if ($notice && isset($map[$notice])) {
 			[$cls, $msg] = $map[$notice];
