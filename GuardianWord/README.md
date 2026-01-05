@@ -2,7 +2,7 @@
 
 Questa cartella contiene:
 
-- `guardian/`: plugin WordPress “Guardian”
+- `guardian-ultimate/`: plugin WordPress “Guardian Ultimate” (modulare)
 - `tools/license_gen.php`: generatore offline di licenze (token firmati Ed25519)
 - `whmcs/`: addon module WHMCS per gestione licenze/token + API
 
@@ -24,13 +24,13 @@ php tools/license_gen.php gen-keys
 php tools/license_gen.php gen-token --private-key-b64 "<PRIVATE_KEY_B64>" --domain "example.com" --license-id "LIC-001" --expires-days 365
 ```
 
-4) In WordPress: **Bacheca > Guardian > Licenza** → incolla il token.
+4) In WordPress: **Bacheca > Guardian Ultimate > Licenza** → incolla il token.
 
 ### Flusso licenze con WHMCS (consigliato)
 
 1) Installa il modulo WHMCS in `whmcs/` (vedi `whmcs/README.md`)
 2) In WHMCS genera le chiavi e copia `PUBLIC_KEY_B64` nel plugin (`License::PUBLIC_KEY_B64`)
-3) In WordPress: **Bacheca > Guardian > Licenza**
+3) In WordPress: **Bacheca > Guardian Ultimate > Licenza**
    - seleziona **WHMCS (auto-recupero)**
    - imposta:
      - Validate URL: `.../modules/addons/guardian_licensing/api/validate.php`
@@ -40,4 +40,8 @@ php tools/license_gen.php gen-token --private-key-b64 "<PRIVATE_KEY_B64>" --doma
 4) Guardian farà refresh automatico (cache + job hourly) e userà sempre token firmati.
 
 Nota: l’API WHMCS può essere ulteriormente “chiusa” con allowlist IP e allowlist User-Agent (default `Guardian/`).
+
+### Moduli / Bundle / Addon
+
+Guardian Ultimate abilita moduli in base a `feat.modules` nel token (WHMCS) e consente toggle locali (solo per moduli inclusi nel piano).
 

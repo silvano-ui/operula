@@ -29,32 +29,84 @@ final class ServiceResolver
 		return $r ? self::toSvc($r) : null;
 	}
 
-	/**
-	 * Best-effort: reads a configurable option named "guardian_license_type" if present.
-	 */
-	private static function licenseTypeForService(int $serviceId): string
+	private static function configOptionValueForService(int $serviceId, string $key): string
 	{
-		// Find configurable option id by option name (guarded).
 		$opt = Capsule::table('tblproductconfigoptions')
-			->where('optionname', 'like', '%guardian_license_type%')
-			->first(['id']);
+			->where('optionname', 'like', '%' . $key . '%')
+			->first(['id', 'optionname']);
 		if (!$opt) {
 			return '';
 		}
+		$optId = (int) $opt->id;
 
 		$rel = Capsule::table('tblhostingconfigoptions')
 			->where('relid', $serviceId)
-			->where('configid', (int) $opt->id)
+			->where('configid', $optId)
 			->value('optionid');
 		if (!$rel) {
 			return '';
 		}
 
-		// optionid points to tblproductconfigoptionssub.id; get optionname value.
 		$val = Capsule::table('tblproductconfigoptionssub')
 			->where('id', (int) $rel)
 			->value('optionname');
-		return is_string($val) ? strtolower(trim($val)) : '';
+		if (!is_string($val)) {
+			return '';
+		}
+		// WHMCS often stores "Label|something"; take left side.
+		$val = explode('|', $val, 2)[0];
+		return strtolower(trim($val));
+	}
+
+	private static function addonsForService(int $serviceId): array
+	{
+		$rows = Capsule::table('tblhostingaddons')
+			->where('hostingid', $serviceId)
+			->whereIn('status', ['Active', 'Completed'])
+			->get(['addonid']);
+		$addonIds = [];
+		foreach ($rows as $r) {
+			$addonIds[] = (int) $r->addonid;
+		}
+		if (!$addonIds) {
+			return [];
+		}
+		$names = Capsule::table('tbladdons')
+			->whereIn('id', $addonIds)
+			->get(['name']);
+		$out = [];
+		foreach ($names as $n) {
+			if (isset($n->name) && is_string($n->name)) {
+				$out[] = strtolower(trim($n->name));
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Best-effort: reads a configurable option named "guardian_license_type" if present.
+	 */
+	private static function licenseTypeForService(int $serviceId): string
+	{
+		return self::configOptionValueForService($serviceId, 'guardian_license_type');
+	}
+
+	private static function modulesForService(int $serviceId): array
+	{
+		$raw = self::configOptionValueForService($serviceId, 'guardian_modules');
+		if ($raw === '') {
+			return [];
+		}
+		$raw = str_replace(['+', ';'], [',', ','], $raw);
+		$parts = array_filter(array_map('trim', explode(',', $raw)));
+		$out = [];
+		foreach ($parts as $p) {
+			$p = strtolower(trim($p));
+			if ($p !== '') {
+				$out[] = $p;
+			}
+		}
+		return array_values(array_unique($out));
 	}
 
 	private static function toSvc($r): array
@@ -69,6 +121,8 @@ final class ServiceResolver
 			'cycle' => (string) ($r->billingcycle ?? ''),
 			'package_id' => (int) ($r->packageid ?? 0),
 			'license_type' => self::licenseTypeForService($serviceId),
+			'modules' => self::modulesForService($serviceId),
+			'addons' => self::addonsForService($serviceId),
 		];
 	}
 }

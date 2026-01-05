@@ -166,6 +166,8 @@ final class Repo
 		}
 
 		$token = null;
+		$modules = self::computeModules($svc);
+		$plan = self::computePlan($svc);
 		if ($status === 'active' && $domain !== '') {
 			$payload = [
 				'v' => 1,
@@ -175,7 +177,14 @@ final class Repo
 				'exp' => $exp,
 				'feat' => [
 					'guardian' => true,
+					'plan' => $plan,
 					'type' => (string) ($svc['license_type'] ?? ''),
+					'modules' => $modules,
+					'core' => true,
+					'integrity' => in_array('integrity', $modules, true),
+					'backup' => in_array('backup', $modules, true),
+					'security' => in_array('security', $modules, true),
+					'health' => in_array('health', $modules, true),
 				],
 			];
 			$token = Signer::signToken($payload, $keys['private_b64']);
@@ -199,6 +208,8 @@ final class Repo
 		}
 
 		$data['ok'] = true;
+		$data['plan'] = $plan;
+		$data['modules'] = $modules;
 		return $data;
 	}
 
@@ -348,6 +359,71 @@ final class Repo
 		}
 		$ts = strtotime($nextDue . ' 23:59:59 UTC');
 		return $ts ? (int) $ts : 0;
+	}
+
+	private static function computePlan(array $svc): string
+	{
+		$type = strtolower((string) ($svc['license_type'] ?? ''));
+		if ($type === 'trial') {
+			return 'trial';
+		}
+		$cycle = strtolower((string) ($svc['cycle'] ?? ''));
+		if ($cycle === 'annually') {
+			return 'annual';
+		}
+		if ($cycle === 'biennially') {
+			return 'biennial';
+		}
+		if ($cycle === 'triennially') {
+			return 'triennial';
+		}
+		return $cycle !== '' ? $cycle : 'custom';
+	}
+
+	private static function computeModules(array $svc): array
+	{
+		// Base bundle: core + integrity.
+		$mods = ['core', 'integrity'];
+
+		// Configurable option guardian_modules can override/add.
+		if (!empty($svc['modules']) && is_array($svc['modules'])) {
+			foreach ($svc['modules'] as $m) {
+				if (is_string($m) && $m !== '') {
+					$mods[] = $m;
+				}
+			}
+		}
+
+		// Product addons can add modules (name contains keywords).
+		if (!empty($svc['addons']) && is_array($svc['addons'])) {
+			foreach ($svc['addons'] as $a) {
+				$a = is_string($a) ? $a : '';
+				if ($a === '') {
+					continue;
+				}
+				if (strpos($a, 'backup') !== false) {
+					$mods[] = 'backup';
+				}
+				if (strpos($a, 'security') !== false || strpos($a, 'vuln') !== false) {
+					$mods[] = 'security';
+				}
+				if (strpos($a, 'health') !== false || strpos($a, 'performance') !== false || strpos($a, 'monitor') !== false) {
+					$mods[] = 'health';
+				}
+			}
+		}
+
+		// Normalize to known set.
+		$known = ['core', 'integrity', 'backup', 'security', 'health'];
+		$out = [];
+		foreach ($mods as $m) {
+			$m = strtolower(trim((string) $m));
+			if (in_array($m, $known, true)) {
+				$out[$m] = true;
+			}
+		}
+		$out['core'] = true;
+		return array_keys($out);
 	}
 
 	public static function getSetting(string $setting, string $default = ''): string

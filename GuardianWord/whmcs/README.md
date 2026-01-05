@@ -23,7 +23,12 @@ Questa cartella contiene un **addon module WHMCS** che gestisce:
 3) Configura i tuoi prodotti WHMCS:
    - usa **configurable options** (opzionale) per definire tipo licenza, es:
      - `guardian_license_type`: `trial`, `annual`, `biennial`
+     - `guardian_modules`: lista moduli (es: `backup,security,health`) oppure `backup+security`
    - in alternativa, il modulo usa il billing cycle e la `nextduedate` del servizio.
+   - in alternativa/aggiunta, puoi usare **Product Addons** con nomi contenenti:
+     - `backup` → abilita modulo backup
+     - `security`/`vuln` → abilita modulo security
+     - `health`/`performance`/`monitor` → abilita modulo health
 
 ### Endpoint di verifica (per integrazione plugin)
 
@@ -81,4 +86,13 @@ Config (Addon module):
 - `lock_first`: lega la licenza al primo dominio che valida (default)
 - `allow_change`: aggiorna automaticamente il dominio al nuovo valore
 - `reset_required`: se cambia dominio, l’API risponde `domain_reset_required` finché non fai reset (endpoint reset o azione admin)
+
+### Piani (trial/annuale/biennale/triennale)
+
+Il token include `feat.plan`:
+- `trial` se `guardian_license_type=trial`
+- altrimenti mappa il billing cycle WHMCS:
+  - `Annually` → `annual`
+  - `Biennially` → `biennial`
+  - `Triennially` → `triennial`
 

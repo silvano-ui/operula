@@ -14,6 +14,8 @@
         <th>Service ID</th>
         <th>License ID</th>
         <th>Domain</th>
+        <th>Plan</th>
+        <th>Modules</th>
         <th>Status</th>
         <th>Expires</th>
         <th>Token</th>
@@ -25,6 +27,14 @@
           <td>{$lic.service_id}</td>
           <td>{$lic.license_id}</td>
           <td>{$lic.domain}</td>
+          <td>{if $lic.plan}{$lic.plan}{else}-{/if}</td>
+          <td>
+            {if $lic.modules}
+              {implode(', ', $lic.modules)}
+            {else}
+              -
+            {/if}
+          </td>
           <td>{$lic.status}</td>
           <td>{if $lic.expires_at > 0}{$lic.expires_at|date_format:"%Y-%m-%d"}{else}never{/if}</td>
           <td>
