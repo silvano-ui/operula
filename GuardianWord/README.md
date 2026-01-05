@@ -70,3 +70,7 @@ Se la licenza include `feat.backup_pro` (WHMCS: `guardian_backup_tier=pro`), puo
 Bootstrap:
 - `guardian-ultimate.php` è minimale (costanti + autoloader + `Bootstrap::init()`).
 
+Registry moduli:
+- ogni modulo ha `modules/<modulo>/module.php` (manifest)
+- il core carica i moduli via `ModuleManager` (niente scanning, registry fisso).
+
