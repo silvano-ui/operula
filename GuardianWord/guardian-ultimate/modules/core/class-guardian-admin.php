@@ -1,10 +1,35 @@
 <?php
 
-// Back-compat stub: implementation moved to /modules/core/.
-if (!defined('ABSPATH')) {
-	exit;
-}
-require_once dirname(__DIR__) . '/modules/core/class-guardian-admin.php';
+namespace Guardian;
+
+final class Admin {
+	private Storage $storage;
+	private License $license;
+	private ?Scanner $scanner = null;
+	private ?Backup $backup = null;
+	private ?RestorePoints $restorePoints = null;
+
+	public function __construct(Storage $storage, License $license) {
+		$this->storage = $storage;
+		$this->license = $license;
+	}
+
+	public function register(): void {
+		add_action('admin_menu', [$this, 'admin_menu']);
+		add_action('admin_post_guardian_save_license', [$this, 'handle_save_license']);
+		add_action('admin_post_guardian_fetch_license', [$this, 'handle_fetch_license']);
+		add_action('admin_post_guardian_reset_domain', [$this, 'handle_reset_domain']);
+		add_action('admin_post_guardian_reset_install', [$this, 'handle_reset_install']);
+		add_action('admin_post_guardian_rotate_install_id', [$this, 'handle_rotate_install_id']);
+		add_action('admin_post_guardian_save_modules', [$this, 'handle_save_modules']);
+		add_action('admin_post_guardian_create_restore_point', [$this, 'handle_create_restore_point']);
+		add_action('admin_post_guardian_restore_from_point', [$this, 'handle_restore_from_point']);
+		add_action('admin_post_guardian_dbpro_restore_start', [$this, 'handle_dbpro_restore_start']);
+		add_action('admin_post_guardian_create_snapshot', [$this, 'handle_create_snapshot']);
+		add_action('admin_post_guardian_rollback_last', [$this, 'handle_rollback_last']);
+		add_action('admin_post_guardian_restore_full_last', [$this, 'handle_restore_full_last']);
+		add_action('admin_post_guardian_save_settings', [$this, 'handle_save_settings']);
+	}
 
 	public function admin_menu(): void {
 		add_menu_page(

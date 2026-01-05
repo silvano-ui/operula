@@ -63,5 +63,7 @@ Se la licenza include `feat.backup_pro` (WHMCS: `guardian_backup_tier=pro`), puo
 
 ### Architettura / modularità futura
 
-`guardian-ultimate/` ora include un autoloader minimale (`includes/class-guardian-autoloader.php`) per mantenere ordine e permettere aggiunta di moduli/integrazioni senza riscrivere tutto ogni volta (senza rompere i file legacy).
+`guardian-ultimate/` ora usa una struttura modulare:
+- `modules/core`, `modules/integrity`, `modules/backup`, …
+- i file in `includes/` sono stub di retro-compatibilità che caricano i file reali dai moduli.
 

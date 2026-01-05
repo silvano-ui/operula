@@ -1,10 +1,6 @@
 <?php
 
-// Back-compat stub: implementation moved to /modules/integrity/.
-if (!defined('ABSPATH')) {
-	exit;
-}
-require_once dirname(__DIR__) . '/modules/integrity/class-guardian-upgrader-hooks.php';
+namespace Guardian;
 
 final class UpgraderHooks {
 	private Storage $storage;

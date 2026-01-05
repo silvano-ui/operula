@@ -1,10 +1,6 @@
 <?php
 
-// Back-compat stub: implementation moved to /modules/integrity/.
-if (!defined('ABSPATH')) {
-	exit;
-}
-require_once dirname(__DIR__) . '/modules/integrity/class-guardian-scanner.php';
+namespace Guardian;
 
 final class Scanner {
 	private Storage $storage;

@@ -1,10 +1,6 @@
 <?php
 
-// Back-compat stub: implementation moved to /modules/backup/.
-if (!defined('ABSPATH')) {
-	exit;
-}
-require_once dirname(__DIR__) . '/modules/backup/class-guardian-db-backup-pro.php';
+namespace Guardian;
 
 /**
  * Backup Pro: chunked/resumable DB snapshot + step restore.

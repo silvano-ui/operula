@@ -1,10 +1,6 @@
 <?php
 
-// Back-compat stub: implementation moved to /modules/backup/.
-if (!defined('ABSPATH')) {
-	exit;
-}
-require_once dirname(__DIR__) . '/modules/backup/class-guardian-restore-points.php';
+namespace Guardian;
 
 /**
  * Incremental restore points (file-level dedup).

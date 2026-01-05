@@ -1,10 +1,6 @@
 <?php
 
-// Back-compat stub: implementation moved to /modules/core/.
-if (!defined('ABSPATH')) {
-	exit;
-}
-require_once dirname(__DIR__) . '/modules/core/class-guardian-license.php';
+namespace Guardian;
 
 /**
  * Licensing (offline token signed).
