@@ -150,13 +150,22 @@ final class License {
 		}
 
 		$domain = $this->site_host();
+		$ts = time();
+		$nonce = $this->new_nonce();
+		$sig = $this->sign_whmcs_request('POST', $url, $licenseId, $domain, $ts, $nonce);
 		$body = [
 			'license_id' => $licenseId,
 			'domain' => $domain,
+			'ts' => $ts,
+			'nonce' => $nonce,
+			'sig' => $sig,
 		];
-		$apiSecret = (string) ($conf['api_secret'] ?? '');
-		if ($apiSecret !== '') {
-			$body['api_secret'] = $apiSecret;
+		// Compat: se secret non impostato e firma vuota, invia eventualmente api_secret (legacy).
+		if ($sig === '') {
+			$apiSecret = (string) ($conf['api_secret'] ?? '');
+			if ($apiSecret !== '') {
+				$body['api_secret'] = $apiSecret;
+			}
 		}
 
 		$res = wp_remote_post($url, [
@@ -206,13 +215,23 @@ final class License {
 		$conf = $this->get_whmcs_conf();
 		$url = (string) ($conf['reset_url'] ?? '');
 		$licenseId = (string) ($conf['license_id'] ?? '');
-		$apiSecret = (string) ($conf['api_secret'] ?? '');
 		if ($url === '' || $licenseId === '') {
 			return ['ok' => false, 'code' => 'whmcs_missing', 'message' => __('Config WHMCS incompleta (reset_url/license_id).', 'guardian')];
 		}
-		$body = ['license_id' => $licenseId];
-		if ($apiSecret !== '') {
-			$body['api_secret'] = $apiSecret;
+		$ts = time();
+		$nonce = $this->new_nonce();
+		$sig = $this->sign_whmcs_request('POST', $url, $licenseId, '', $ts, $nonce);
+		$body = [
+			'license_id' => $licenseId,
+			'ts' => $ts,
+			'nonce' => $nonce,
+			'sig' => $sig,
+		];
+		if ($sig === '') {
+			$apiSecret = (string) ($conf['api_secret'] ?? '');
+			if ($apiSecret !== '') {
+				$body['api_secret'] = $apiSecret;
+			}
 		}
 		$res = wp_remote_post($url, [
 			'timeout' => 12,
@@ -340,6 +359,33 @@ final class License {
 		}
 		$out = base64_decode($s, true);
 		return is_string($out) ? $out : null;
+	}
+
+	private function new_nonce(): string {
+		$bin = function_exists('random_bytes') ? random_bytes(16) : openssl_random_pseudo_bytes(16);
+		$bin = is_string($bin) ? $bin : (string) wp_generate_password(16, true, true);
+		return rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
+	}
+
+	/**
+	 * Firma richiesta WHMCS con HMAC-SHA256 (anti-replay).
+	 *
+	 * Message format:
+	 * POST\n/path\n{licenseId}\n{domain}\n{ts}\n{nonce}
+	 */
+	private function sign_whmcs_request(string $method, string $url, string $licenseId, string $domain, int $ts, string $nonce): string {
+		$conf = $this->get_whmcs_conf();
+		$secret = (string) ($conf['api_secret'] ?? '');
+		if ($secret === '') {
+			// Compat: se secret non impostato, firma vuota (WHMCS può accettare richieste non firmate se non enforced).
+			return '';
+		}
+		$path = parse_url($url, PHP_URL_PATH);
+		$path = is_string($path) ? $path : '';
+		$domain = (string) $domain;
+		$msg = strtoupper($method) . "\n" . $path . "\n" . $licenseId . "\n" . $domain . "\n" . $ts . "\n" . $nonce;
+		$raw = hash_hmac('sha256', $msg, $secret, true);
+		return rtrim(strtr(base64_encode($raw), '+/', '-_'), '=');
 	}
 }
 

@@ -35,14 +35,37 @@ Il modulo espone un endpoint JSON:
 Input (POST):
 - `license_id`
 - `domain`
- - `api_secret` (se configurato; consigliato)
+ - **signed request** (consigliato/di default se `apiSecret` impostato):
+   - `ts` (unix timestamp)
+   - `nonce` (random, base64url)
+   - `sig` (HMAC-SHA256 base64url)
+ - legacy: `api_secret` (solo se non enforced)
 
 Output:
 - `status`: `active|expired|suspended|terminated|invalid`
 - `token`: token firmato (solo se attivo/valido)
 - `exp`: unix timestamp
 
-> Nota: per produzione è consigliato aggiungere autenticazione (es. secret per installazione o firma HMAC). Nel codice è predisposta l’opzione “API Secret”.
+### Firma richieste (HMAC)
+
+Se `apiSecret` è configurato nell’addon e `Enforce signed requests` è ON (default), l’API richiede firma.
+
+Stringa firmata:
+
+- validate:
+  - `POST\n{path}\n{license_id}\n{domain}\n{ts}\n{nonce}`
+- reset:
+  - `POST\n{path}\n{license_id}\n\n{ts}\n{nonce}`
+
+`sig = base64url(HMAC_SHA256(apiSecret, message))`
+
+Protezione aggiuntiva:
+- **anti-replay**: i nonce vengono memorizzati per una finestra (skew+60s)
+- **rate limit**: per `license_id + IP` (configurabile)
+
+### Requisito consigliato
+
+- Usa **HTTPS** per gli endpoint WHMCS.
 
 ### Domain policy
 

@@ -36,6 +36,6 @@ php tools/license_gen.php gen-token --private-key-b64 "<PRIVATE_KEY_B64>" --doma
      - Validate URL: `.../modules/addons/guardian_licensing/api/validate.php`
      - Reset URL: `.../modules/addons/guardian_licensing/api/reset.php`
      - License ID (es. `GL-...`)
-     - API Secret (se impostato nel modulo)
+     - API Secret (se impostato nel modulo; usato per firmare le richieste HMAC con `ts/nonce/sig`)
 4) Guardian farà refresh automatico (cache + job hourly) e userà sempre token firmati.
 

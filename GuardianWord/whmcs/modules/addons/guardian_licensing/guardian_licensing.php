@@ -28,6 +28,24 @@ function guardian_licensing_config()
 				"Default" => "",
 				"Description" => "Se valorizzato, l'endpoint validate richiede anche api_secret.",
 			],
+			"enforceSignedRequests" => [
+				"FriendlyName" => "Enforce signed requests (HMAC)",
+				"Type" => "yesno",
+				"Default" => "on",
+				"Description" => "Se ON: richiede ts/nonce/sig (HMAC-SHA256) per validate/reset quando apiSecret è impostato.",
+			],
+			"maxClockSkewSeconds" => [
+				"FriendlyName" => "Max clock skew (seconds)",
+				"Type" => "text",
+				"Size" => "6",
+				"Default" => "300",
+			],
+			"rateLimitPerMinute" => [
+				"FriendlyName" => "Rate limit per minute (per license+ip)",
+				"Type" => "text",
+				"Size" => "6",
+				"Default" => "60",
+			],
 			"domainPolicy" => [
 				"FriendlyName" => "Domain policy",
 				"Type" => "dropdown",

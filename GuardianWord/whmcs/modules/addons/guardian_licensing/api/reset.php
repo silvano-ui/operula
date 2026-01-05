@@ -22,6 +22,9 @@ try {
 	Repo::ensureSchema();
 	$licenseId = isset($_POST['license_id']) ? trim((string) $_POST['license_id']) : '';
 	$apiSecretInput = isset($_POST['api_secret']) ? (string) $_POST['api_secret'] : '';
+	$ts = isset($_POST['ts']) ? (int) $_POST['ts'] : 0;
+	$nonce = isset($_POST['nonce']) ? (string) $_POST['nonce'] : '';
+	$sig = isset($_POST['sig']) ? (string) $_POST['sig'] : '';
 
 	if ($licenseId === '') {
 		http_response_code(400);
@@ -31,13 +34,59 @@ try {
 
 	$apiSecret = Signer::loadApiSecretFromAddonSettings();
 	if ($apiSecret !== '') {
-		if (!hash_equals($apiSecret, $apiSecretInput)) {
-			http_response_code(403);
-			echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'invalid api_secret']);
+		$enforce = Repo::getSetting('enforceSignedRequests', 'on');
+		$enforce = strtolower((string) $enforce) !== '' && strtolower((string) $enforce) !== 'off';
+
+		$skew = (int) Repo::getSetting('maxClockSkewSeconds', '300');
+		if ($skew <= 0) {
+			$skew = 300;
+		}
+
+		$rate = (int) Repo::getSetting('rateLimitPerMinute', '30');
+		if ($rate <= 0) {
+			$rate = 30;
+		}
+
+		$ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
+		$rlKey = 'reset:' . $licenseId . ':' . $ip;
+		if (!Repo::rateLimitAllow($rlKey, 60, $rate)) {
+			http_response_code(429);
+			echo json_encode(['ok' => false, 'status' => 'rate_limited', 'message' => 'too many requests']);
 			exit;
 		}
-	} else {
-		// No secret configured: still allow, but warn in response.
+
+		if ($sig !== '' && $ts > 0 && $nonce !== '') {
+			if (abs(time() - $ts) > $skew) {
+				http_response_code(401);
+				echo json_encode(['ok' => false, 'status' => 'unauthorized', 'message' => 'timestamp skew']);
+				exit;
+			}
+			if (Repo::nonceSeenOrStore($licenseId, $nonce, $ts, $ip, $skew + 60)) {
+				http_response_code(401);
+				echo json_encode(['ok' => false, 'status' => 'unauthorized', 'message' => 'replay detected']);
+				exit;
+			}
+			$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? ''), PHP_URL_PATH);
+			$path = is_string($path) ? $path : '';
+			$msg = "POST\n{$path}\n{$licenseId}\n\n{$ts}\n{$nonce}";
+			$expect = rtrim(strtr(base64_encode(hash_hmac('sha256', $msg, $apiSecret, true)), '+/', '-_'), '=');
+			if (!hash_equals($expect, $sig)) {
+				http_response_code(403);
+				echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'bad signature']);
+				exit;
+			}
+		} else {
+			if ($enforce) {
+				http_response_code(401);
+				echo json_encode(['ok' => false, 'status' => 'unauthorized', 'message' => 'signature required']);
+				exit;
+			}
+			if (!hash_equals($apiSecret, $apiSecretInput)) {
+				http_response_code(403);
+				echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'invalid api_secret']);
+				exit;
+			}
+		}
 	}
 
 	$row = Repo::findByLicenseId($licenseId);

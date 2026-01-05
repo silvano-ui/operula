@@ -184,6 +184,13 @@ final class Admin {
 
 		$licenseStatus = $this->license->status();
 		$licensed = !empty($licenseStatus['ok']);
+		if (!$licensed && $this->license->get_mode() === 'whmcs' && !empty($licenseStatus['whmcs']['status'])) {
+			$wst = (string) $licenseStatus['whmcs']['status'];
+			if ($wst === 'domain_reset_required') {
+				// Evidenzia azione consigliata.
+				echo '<div class="notice notice-warning"><p><strong>Guardian</strong>: ' . esc_html__('Dominio cambiato: serve reset dominio su WHMCS.', 'guardian') . '</p></div>';
+			}
+		}
 
 		$diffPath = isset($_GET['guardian_diff']) ? (string) $_GET['guardian_diff'] : '';
 		if ($diffPath !== '') {

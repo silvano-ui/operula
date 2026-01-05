@@ -7,6 +7,9 @@ final class Repo
 	public static function ensureSchema(): void
 	{
 		if (Capsule::schema()->hasTable('mod_guardian_licenses')) {
+			// Ensure auxiliary tables.
+			self::ensureNonceSchema();
+			self::ensureRateLimitSchema();
 			return;
 		}
 		Capsule::schema()->create('mod_guardian_licenses', function ($table) {
@@ -20,6 +23,102 @@ final class Repo
 			$table->integer('expires_at')->unsigned()->default(0);
 			$table->integer('updated_at')->unsigned()->default(0);
 		});
+
+		self::ensureNonceSchema();
+		self::ensureRateLimitSchema();
+	}
+
+	private static function ensureNonceSchema(): void
+	{
+		if (Capsule::schema()->hasTable('mod_guardian_nonces')) {
+			return;
+		}
+		Capsule::schema()->create('mod_guardian_nonces', function ($table) {
+			$table->increments('id');
+			$table->string('license_id', 64)->index();
+			$table->string('nonce', 128)->unique();
+			$table->integer('ts')->unsigned()->default(0);
+			$table->string('ip', 64)->default('');
+			$table->integer('created_at')->unsigned()->default(0);
+		});
+	}
+
+	private static function ensureRateLimitSchema(): void
+	{
+		if (Capsule::schema()->hasTable('mod_guardian_rate_limits')) {
+			return;
+		}
+		Capsule::schema()->create('mod_guardian_rate_limits', function ($table) {
+			$table->increments('id');
+			$table->string('key', 190)->unique();
+			$table->integer('window_start')->unsigned()->default(0);
+			$table->integer('count')->unsigned()->default(0);
+			$table->integer('updated_at')->unsigned()->default(0);
+		});
+	}
+
+	public static function nonceSeenOrStore(string $licenseId, string $nonce, int $ts, string $ip, int $ttlSeconds): bool
+	{
+		self::ensureSchema();
+		$now = time();
+		$cutoff = $now - max(60, $ttlSeconds);
+		Capsule::table('mod_guardian_nonces')->where('created_at', '<', $cutoff)->delete();
+
+		$exists = Capsule::table('mod_guardian_nonces')->where('nonce', $nonce)->exists();
+		if ($exists) {
+			return true;
+		}
+
+		Capsule::table('mod_guardian_nonces')->insert([
+			'license_id' => $licenseId,
+			'nonce' => $nonce,
+			'ts' => $ts,
+			'ip' => $ip,
+			'created_at' => $now,
+		]);
+		return false;
+	}
+
+	/**
+	 * Simple fixed-window rate limit. Returns true if allowed.
+	 */
+	public static function rateLimitAllow(string $key, int $windowSeconds, int $maxInWindow): bool
+	{
+		self::ensureSchema();
+		$now = time();
+		$windowStart = $now - ($now % max(1, $windowSeconds));
+
+		$row = Capsule::table('mod_guardian_rate_limits')->where('key', $key)->first();
+		if (!$row) {
+			Capsule::table('mod_guardian_rate_limits')->insert([
+				'key' => $key,
+				'window_start' => $windowStart,
+				'count' => 1,
+				'updated_at' => $now,
+			]);
+			return true;
+		}
+
+		$curWindow = (int) $row->window_start;
+		$curCount = (int) $row->count;
+		if ($curWindow !== $windowStart) {
+			Capsule::table('mod_guardian_rate_limits')->where('key', $key)->update([
+				'window_start' => $windowStart,
+				'count' => 1,
+				'updated_at' => $now,
+			]);
+			return true;
+		}
+
+		if ($curCount >= $maxInWindow) {
+			return false;
+		}
+
+		Capsule::table('mod_guardian_rate_limits')->where('key', $key)->update([
+			'count' => $curCount + 1,
+			'updated_at' => $now,
+		]);
+		return true;
 	}
 
 	/**
