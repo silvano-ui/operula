@@ -47,6 +47,13 @@ function guardian_licensing_config()
 				"Default" => "",
 				"Description" => "Comma-separated IP/CIDR (es: 203.0.113.10, 198.51.100.0/24). Vuoto = allow all.",
 			],
+			"uaAllowlist" => [
+				"FriendlyName" => "User-Agent allowlist (API)",
+				"Type" => "text",
+				"Size" => "100",
+				"Default" => "Guardian/",
+				"Description" => "Comma-separated substrings. Se valorizzato, l'API accetta solo User-Agent che contengono una di queste stringhe.",
+			],
 			"maxClockSkewSeconds" => [
 				"FriendlyName" => "Max clock skew (seconds)",
 				"Type" => "text",

@@ -191,7 +191,10 @@ final class License {
 
 		$res = wp_remote_post($url, [
 			'timeout' => 12,
-			'headers' => ['Accept' => 'application/json'],
+			'headers' => [
+				'Accept' => 'application/json',
+				'User-Agent' => 'Guardian/' . (defined('GUARDIAN_VERSION') ? GUARDIAN_VERSION : '0') . ' (+WordPress)',
+			],
 			'body' => $body,
 		]);
 
@@ -257,7 +260,10 @@ final class License {
 		}
 		$res = wp_remote_post($url, [
 			'timeout' => 12,
-			'headers' => ['Accept' => 'application/json'],
+			'headers' => [
+				'Accept' => 'application/json',
+				'User-Agent' => 'Guardian/' . (defined('GUARDIAN_VERSION') ? GUARDIAN_VERSION : '0') . ' (+WordPress)',
+			],
 			'body' => $body,
 		]);
 		if (is_wp_error($res)) {
@@ -297,7 +303,10 @@ final class License {
 		}
 		$res = wp_remote_post($url, [
 			'timeout' => 12,
-			'headers' => ['Accept' => 'application/json'],
+			'headers' => [
+				'Accept' => 'application/json',
+				'User-Agent' => 'Guardian/' . (defined('GUARDIAN_VERSION') ? GUARDIAN_VERSION : '0') . ' (+WordPress)',
+			],
 			'body' => $body,
 		]);
 		if (is_wp_error($res)) {

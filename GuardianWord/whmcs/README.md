@@ -64,6 +64,7 @@ Protezione aggiuntiva:
 - **rate limit**: per `license_id + IP` (configurabile)
 - **IP allowlist**: se configurata, blocca tutto il resto
 - **install binding**: se abilitato, l’API richiede `install_id` e lo lega alla prima installazione (reset necessario per cambiare)
+- **User-Agent allowlist**: se configurata, blocca tutto il resto (default `Guardian/`)
 
 ### Requisito consigliato
 

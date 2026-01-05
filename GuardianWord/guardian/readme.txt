@@ -19,6 +19,10 @@ Guardian funziona **solo** con una licenza valida.
   - **WHMCS (auto-recupero)**: inserisci endpoint + License ID e Guardian scarica/aggiorna il token in automatico
 - Il token è firmato (Ed25519): il plugin verifica la firma con una chiave pubblica incorporata.
 - Lo script di generazione (chiave privata) va tenuto **separato** e non deve mai essere caricato su WordPress.
+- In modalità WHMCS, Guardian usa:
+  - richieste firmate HMAC (`ts/nonce/sig`)
+  - un `install_id` per legare la licenza alla singola installazione
+  - User-Agent `Guardian/<version> (+WordPress)` (utile con allowlist lato WHMCS)
 
 == Installazione ==
 

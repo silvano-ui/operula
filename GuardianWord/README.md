@@ -39,3 +39,5 @@ php tools/license_gen.php gen-token --private-key-b64 "<PRIVATE_KEY_B64>" --doma
      - API Secret (se impostato nel modulo; usato per firmare le richieste HMAC con `ts/nonce/sig`)
 4) Guardian farà refresh automatico (cache + job hourly) e userà sempre token firmati.
 
+Nota: l’API WHMCS può essere ulteriormente “chiusa” con allowlist IP e allowlist User-Agent (default `Guardian/`).
+

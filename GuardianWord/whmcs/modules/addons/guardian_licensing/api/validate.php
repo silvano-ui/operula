@@ -47,6 +47,12 @@ try {
 		echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'ip not allowed']);
 		exit;
 	}
+	$uaAllow = Repo::getSetting('uaAllowlist', '');
+	if (!Security::uaAllowed(Security::userAgent(), $uaAllow)) {
+		http_response_code(403);
+		echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'user-agent not allowed']);
+		exit;
+	}
 
 	$apiSecret = Signer::loadApiSecretFromAddonSettings();
 	if ($apiSecret !== '') {

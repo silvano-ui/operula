@@ -56,6 +56,33 @@ final class Security
 		return rtrim(strtr(base64_encode($bin), '+/', '-_'), '=');
 	}
 
+	public static function userAgent(): string
+	{
+		return isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
+	}
+
+	/**
+	 * allowlist: comma-separated substrings. Empty means allow all.
+	 */
+	public static function uaAllowed(string $ua, string $allowlist): bool
+	{
+		$allowlist = trim($allowlist);
+		if ($allowlist === '') {
+			return true;
+		}
+		$ua = (string) $ua;
+		$parts = array_filter(array_map('trim', explode(',', $allowlist)));
+		foreach ($parts as $p) {
+			if ($p === '') {
+				continue;
+			}
+			if (strpos($ua, $p) !== false) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	public static function message(string $method, string $path, string $licenseId, string $domain, string $installId, int $ts, string $nonce): string
 	{
 		return strtoupper($method) . "\n" . $path . "\n" . $licenseId . "\n" . $domain . "\n" . $installId . "\n" . $ts . "\n" . $nonce;
