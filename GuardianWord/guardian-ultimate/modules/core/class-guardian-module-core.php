@@ -13,8 +13,11 @@ final class ModuleCore implements ModuleInterface {
 	}
 
 	public function register(ModuleContext $ctx): void {
-		// Admin always available when licensed (still shows license page if invalid).
-		$admin = new Admin($ctx->storage, $ctx->license);
+		// Modular admin shell + core sections.
+		AdminRegistry::add_section(new AdminSectionLicense());
+		AdminRegistry::add_section(new AdminSectionModules());
+		AdminRegistry::add_section(new AdminSectionSettings());
+		$admin = new AdminApp($ctx);
 		$admin->register();
 
 		add_action(self::CRON_LICENSE_REFRESH, function () use ($ctx): void {

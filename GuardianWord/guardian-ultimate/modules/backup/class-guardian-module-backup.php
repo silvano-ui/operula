@@ -12,6 +12,8 @@ final class ModuleBackup implements ModuleInterface {
 	}
 
 	public function register(ModuleContext $ctx): void {
+		AdminRegistry::add_section(new AdminSectionBackup());
+
 		add_action(self::CRON_RESTORE_POINT, function () use ($ctx): void {
 			$backupPro = !empty($ctx->payload['feat']['backup_pro']);
 			$ctx->restorePoints()->create_scheduled_from_settings($ctx->settings, $backupPro);
