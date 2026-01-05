@@ -22,6 +22,7 @@ require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-plugin.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-storage.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-license.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-modules.php';
+require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-restore-points.php';
 
 // Existing modules (integrity/backup).
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-scanner.php';

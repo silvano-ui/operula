@@ -18,6 +18,8 @@ final class Storage {
 		$this->mkdir_p($base . '/reports');
 		$this->mkdir_p($base . '/backups');
 		$this->mkdir_p($base . '/logs');
+		$this->mkdir_p($base . '/restore-points');
+		$this->mkdir_p($base . '/blobs');
 	}
 
 	public function base_dir(): ?string {
@@ -103,6 +105,8 @@ final class Storage {
 			'full_restore_include_wp_config' => false,
 			'max_diff_bytes' => 1024 * 1024, // 1 MB
 			'enabled_modules' => ['core', 'integrity', 'backup'],
+			'rp_keep_last' => 10,
+			'rp_max_blob_bytes' => 20 * 1024 * 1024, // 20MB
 		];
 		$opt = get_option(self::OPTION_SETTINGS);
 		return is_array($opt) ? array_merge($defaults, $opt) : $defaults;

@@ -29,7 +29,7 @@ Guardian funziona **solo** con una licenza valida.
 1) Copia la cartella `guardian-ultimate/` in `wp-content/plugins/guardian-ultimate/`
 2) Attiva il plugin da WP Admin.
 3) (Consigliato) abilita il caricamento anticipato come MU-plugin:
-   - copia `guardian/mu-plugin/guardian-loader.php` in `wp-content/mu-plugins/guardian-loader.php`
+   - copia `guardian-ultimate/mu-plugin/guardian-loader.php` in `wp-content/mu-plugins/guardian-loader.php`
    - in alternativa, su alcuni hosting Guardian prova a copiarlo automaticamente all'attivazione (se permessi OK).
 
 == Come funziona ==
@@ -37,7 +37,7 @@ Guardian funziona **solo** con una licenza valida.
 - Moduli (abilitati dal piano + selezionabili in Bacheca > Guardian Ultimate > Moduli):
   - **Core**: licenza, crash guard, safe-mode, scheduler
   - **Integrità**: snapshot, change tracking, diff, report install/upgrade
-  - **Backup**: backup/restore per plugin/tema e restore point (best-effort)
+  - **Backup**: backup/restore per plugin/tema + **restore point incrementali** (dedup) + restore granulare (best-effort)
   - **Security**: (roadmap) feed vulnerabilità + policy auto-update/rollback
   - **Health**: (roadmap) link/performance/conflitti con remediation
 

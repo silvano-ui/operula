@@ -6,11 +6,13 @@ final class UpgraderHooks {
 	private Storage $storage;
 	private Scanner $scanner;
 	private Backup $backup;
+	private RestorePoints $restorePoints;
 
 	public function __construct(Storage $storage, Scanner $scanner, Backup $backup) {
 		$this->storage = $storage;
 		$this->scanner = $scanner;
 		$this->backup  = $backup;
+		$this->restorePoints = new RestorePoints($storage);
 	}
 
 	public function register(): void {
@@ -49,6 +51,7 @@ final class UpgraderHooks {
 
 		$backupZip = null;
 		$siteBackupZip = null;
+		$restorePointId = null;
 		if (!empty($settings['auto_backup_on_upgrade'])) {
 			if ($type === 'plugin') {
 				$pluginFile = (string) ($hook_extra['plugin'] ?? '');
@@ -72,6 +75,30 @@ final class UpgraderHooks {
 			$siteBackupZip = $bak['zip'] ?? null;
 		}
 
+		// Incremental restore point (granulare) per plugin/tema prima dell'upgrade.
+		if (!empty($settings['enabled_modules']) && is_array($settings['enabled_modules']) && in_array('backup', $settings['enabled_modules'], true)) {
+			$paths = [];
+			if ($type === 'plugin') {
+				$pluginFile = (string) ($hook_extra['plugin'] ?? '');
+				$dir = $this->plugin_dir_from_plugin_file($pluginFile);
+				if ($dir && is_dir($dir)) {
+					// Convert to rel path.
+					$paths[] = ltrim(str_replace('\\', '/', substr($dir, strlen(rtrim(ABSPATH, '/\\')))), '/');
+				}
+			} elseif ($type === 'theme') {
+				$theme = (string) ($hook_extra['theme'] ?? '');
+				$dir = $this->theme_dir_from_slug($theme);
+				if ($dir && is_dir($dir)) {
+					$paths[] = ltrim(str_replace('\\', '/', substr($dir, strlen(rtrim(ABSPATH, '/\\')))), '/');
+				}
+			}
+			if ($paths) {
+				$exclude = ['wp-content/uploads/', 'wp-content/cache/', 'wp-content/upgrade/'];
+				$rp = $this->restorePoints->create('pre_' . $type, $paths, $exclude);
+				$restorePointId = is_array($rp) ? ($rp['id'] ?? null) : null;
+			}
+		}
+
 		$op = [
 			'id' => $opId,
 			'type' => $type,
@@ -81,6 +108,7 @@ final class UpgraderHooks {
 			'snapshot_before' => $snapshotBefore,
 			'backup_zip' => $backupZip,
 			'site_backup_zip' => $siteBackupZip,
+			'restore_point_before' => $restorePointId,
 		];
 		if ($type === 'plugin') {
 			$op['plugin'] = (string) ($hook_extra['plugin'] ?? '');

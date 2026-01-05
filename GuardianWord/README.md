@@ -45,3 +45,10 @@ Nota: l’API WHMCS può essere ulteriormente “chiusa” con allowlist IP e al
 
 Guardian Ultimate abilita moduli in base a `feat.modules` nel token (WHMCS) e consente toggle locali (solo per moduli inclusi nel piano).
 
+### Backup incrementale (MVP)
+
+Nel modulo **Backup** è disponibile un “restore point” incrementale con dedup (file-level) e restore granulare:
+- creazione manuale da Admin
+- creazione automatica pre-upgrade per plugin/tema (quando il modulo Backup è attivo)
+- restore di un path (file o directory) a partire da un restore point
+

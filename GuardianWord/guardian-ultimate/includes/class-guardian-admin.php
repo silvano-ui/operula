@@ -7,6 +7,7 @@ final class Admin {
 	private License $license;
 	private ?Scanner $scanner = null;
 	private ?Backup $backup = null;
+	private ?RestorePoints $restorePoints = null;
 
 	public function __construct(Storage $storage, License $license) {
 		$this->storage = $storage;
@@ -21,6 +22,8 @@ final class Admin {
 		add_action('admin_post_guardian_reset_install', [$this, 'handle_reset_install']);
 		add_action('admin_post_guardian_rotate_install_id', [$this, 'handle_rotate_install_id']);
 		add_action('admin_post_guardian_save_modules', [$this, 'handle_save_modules']);
+		add_action('admin_post_guardian_create_restore_point', [$this, 'handle_create_restore_point']);
+		add_action('admin_post_guardian_restore_from_point', [$this, 'handle_restore_from_point']);
 		add_action('admin_post_guardian_create_snapshot', [$this, 'handle_create_snapshot']);
 		add_action('admin_post_guardian_rollback_last', [$this, 'handle_rollback_last']);
 		add_action('admin_post_guardian_restore_full_last', [$this, 'handle_restore_full_last']);
@@ -221,6 +224,63 @@ final class Admin {
 		exit;
 	}
 
+	public function handle_create_restore_point(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_create_restore_point');
+		if (!$this->ensure_licensed_or_die()) {
+			return;
+		}
+		$settings = $this->storage->get_settings();
+		$enabled = isset($settings['enabled_modules']) && is_array($settings['enabled_modules']) ? $settings['enabled_modules'] : [];
+		if (!in_array('backup', $enabled, true)) {
+			wp_die(__('Modulo Backup non abilitato.', 'guardian'));
+		}
+
+		// MVP scope: plugins + themes + wp-config.php
+		$paths = [
+			'wp-content/plugins',
+			'wp-content/themes',
+			'wp-config.php',
+		];
+		$exclude = [
+			'wp-content/uploads/',
+			'wp-content/cache/',
+			'wp-content/upgrade/',
+		];
+		$res = $this->restorePoints()->create('manual', $paths, $exclude);
+		$ok = is_array($res);
+
+		wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'rp_created' : 'rp_create_fail'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
+	public function handle_restore_from_point(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_restore_from_point');
+		if (!$this->ensure_licensed_or_die()) {
+			return;
+		}
+		$settings = $this->storage->get_settings();
+		$enabled = isset($settings['enabled_modules']) && is_array($settings['enabled_modules']) ? $settings['enabled_modules'] : [];
+		if (!in_array('backup', $enabled, true)) {
+			wp_die(__('Modulo Backup non abilitato.', 'guardian'));
+		}
+
+		$id = isset($_POST['restore_point_id']) ? (string) wp_unslash($_POST['restore_point_id']) : '';
+		$path = isset($_POST['restore_rel_path']) ? (string) wp_unslash($_POST['restore_rel_path']) : '';
+		$deleteFirst = !empty($_POST['delete_first']);
+
+		$r = $this->restorePoints()->restore_path($id, $path, $deleteFirst);
+		$ok = !empty($r['ok']);
+
+		wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'rp_restore_ok' : 'rp_restore_fail'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
 	public function render_page(): void {
 		if (!current_user_can('manage_options')) {
 			wp_die(__('Non autorizzato.', 'guardian'));
@@ -340,6 +400,47 @@ final class Admin {
 			echo ' <a class="button" onclick="return confirm(\'Ripristinare l\\\'installazione dai file del backup completo?\\nOperazione potenzialmente distruttiva.\');" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_restore_full_last'), 'guardian_restore_full_last')) . '">' . esc_html__('Ripristina da backup completo (ultima op)', 'guardian') . '</a>';
 		}
 		echo '</p>';
+
+		echo '<hr />';
+		echo '<h2>' . esc_html__('Backup incrementale (restore point)', 'guardian') . '</h2>';
+		if (!in_array('backup', (array) ($this->storage->get_settings()['enabled_modules'] ?? []), true)) {
+			echo '<p><em>' . esc_html__('Modulo Backup disabilitato (o non incluso nel piano).', 'guardian') . '</em></p>';
+		} else {
+			echo '<p>';
+			echo '<a class="button button-primary" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=guardian_create_restore_point'), 'guardian_create_restore_point')) . '">' . esc_html__('Crea restore point adesso', 'guardian') . '</a>';
+			echo '</p>';
+
+			$list = $this->restorePoints()->list(10);
+			if (!$list) {
+				echo '<p><em>' . esc_html__('Nessun restore point ancora.', 'guardian') . '</em></p>';
+			} else {
+				echo '<table class="widefat striped" style="max-width:1100px;"><thead><tr><th>ID</th><th>Label</th><th>Creato</th><th>Files</th><th>Azioni</th></tr></thead><tbody>';
+				foreach ($list as $rp) {
+					$id = (string) ($rp['id'] ?? '');
+					$label = (string) ($rp['label'] ?? '');
+					$created = (string) ($rp['created_gm'] ?? '');
+					$cnt = is_array($rp['counts'] ?? null) ? (int) ($rp['counts']['files'] ?? 0) : 0;
+					echo '<tr>';
+					echo '<td><code>' . esc_html($id) . '</code></td>';
+					echo '<td>' . esc_html($label) . '</td>';
+					echo '<td>' . esc_html($created) . '</td>';
+					echo '<td>' . esc_html((string) $cnt) . '</td>';
+					echo '<td>';
+					echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+					echo '<input type="hidden" name="action" value="guardian_restore_from_point" />';
+					wp_nonce_field('guardian_restore_from_point');
+					echo '<input type="hidden" name="restore_point_id" value="' . esc_attr($id) . '" />';
+					echo '<input type="text" name="restore_rel_path" style="width: 420px;" placeholder="es: wp-content/plugins/slug/ (o file.php)" />';
+					echo ' <label><input type="checkbox" name="delete_first" value="1" /> ' . esc_html__('cancella prima', 'guardian') . '</label>';
+					echo ' <button class="button" type="submit" onclick="return confirm(\'Eseguire restore del path indicato da questo restore point?\');">' . esc_html__('Restore', 'guardian') . '</button>';
+					echo '</form>';
+					echo '</td>';
+					echo '</tr>';
+				}
+				echo '</tbody></table>';
+				echo '<p><small>' . esc_html__('Suggerimento: per ripristinare un plugin usa: wp-content/plugins/nome-plugin/', 'guardian') . '</small></p>';
+			}
+		}
 
 		echo '<hr />';
 
@@ -532,6 +633,10 @@ final class Admin {
 			'install_reset_fail' => ['error', __('Reset install binding non riuscito.', 'guardian')],
 			'install_id_rotated' => ['success', __('Install ID rigenerato.', 'guardian')],
 			'modules_saved' => ['success', __('Moduli salvati.', 'guardian')],
+			'rp_created' => ['success', __('Restore point creato.', 'guardian')],
+			'rp_create_fail' => ['error', __('Creazione restore point non riuscita.', 'guardian')],
+			'rp_restore_ok' => ['success', __('Restore completato.', 'guardian')],
+			'rp_restore_fail' => ['error', __('Restore non riuscito.', 'guardian')],
 		];
 		if ($notice && isset($map[$notice])) {
 			[$cls, $msg] = $map[$notice];
@@ -575,6 +680,13 @@ final class Admin {
 			$this->backup = new Backup($this->storage);
 		}
 		return $this->backup;
+	}
+
+	private function restorePoints(): RestorePoints {
+		if ($this->restorePoints === null) {
+			$this->restorePoints = new RestorePoints($this->storage);
+		}
+		return $this->restorePoints;
 	}
 }
 
