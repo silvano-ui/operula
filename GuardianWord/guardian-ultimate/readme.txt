@@ -43,6 +43,16 @@ Guardian funziona **solo** con una licenza valida.
 
 Nota: in questa versione i moduli Security/Health sono predisposti a livello licenza/UI, ma le funzionalità avanzate sono in roadmap.
 
+== Restore point schedulati ==
+
+Se il modulo **Backup** è attivo, puoi abilitare restore point automatici (hourly/daily) e scegliere lo scope:
+- plugin+temi (consigliato)
+- wp-config.php (opzionale)
+- core (wp-admin/wp-includes) (pesante)
+- uploads (molto pesante)
+
+Puoi anche includere uno snapshot DB (best-effort) nel restore point.
+
 == Limitazioni importanti ==
 
 - Modifiche fatte via FTP/SFTP, deploy, o script esterni: Guardian può rilevarle via snapshot manuale, ma non può garantire backup/rollback se non c’è un ZIP precedente.

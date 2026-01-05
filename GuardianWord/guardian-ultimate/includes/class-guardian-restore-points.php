@@ -18,6 +18,44 @@ final class RestorePoints {
 		$this->storage = $storage;
 	}
 
+	public function create_scheduled_from_settings(array $settings): ?array {
+		$paths = [];
+		$exclude = [
+			'wp-content/cache/',
+			'wp-content/upgrade/',
+		];
+		if (empty($settings['rp_scope_uploads'])) {
+			$exclude[] = 'wp-content/uploads/';
+		}
+		if (!empty($settings['rp_scope_plugins_themes'])) {
+			$paths[] = 'wp-content/plugins';
+			$paths[] = 'wp-content/themes';
+		}
+		if (!empty($settings['rp_scope_wp_config'])) {
+			$paths[] = 'wp-config.php';
+		}
+		if (!empty($settings['rp_scope_core'])) {
+			$paths[] = 'wp-admin';
+			$paths[] = 'wp-includes';
+			// Some root files that matter.
+			$paths[] = 'index.php';
+			$paths[] = 'wp-load.php';
+			$paths[] = 'wp-settings.php';
+		}
+		if (!empty($settings['rp_scope_uploads'])) {
+			$paths[] = 'wp-content/uploads';
+		}
+
+		$opts = [
+			'include_db' => !empty($settings['rp_include_db']),
+			'db_tables_mode' => (string) ($settings['rp_db_tables'] ?? 'wp_core'),
+			'db_custom_tables' => (string) ($settings['rp_db_custom_tables'] ?? ''),
+			'db_max_seconds' => (int) ($settings['rp_db_max_seconds'] ?? 20),
+		];
+
+		return $this->create('scheduled', $paths, $exclude, $opts);
+	}
+
 	public function ensure_dirs(): void {
 		$base = $this->storage->base_dir();
 		if (!$base) {
@@ -27,7 +65,7 @@ final class RestorePoints {
 		$this->mkdir_p($base . '/blobs');
 	}
 
-	public function create(string $label, array $paths, array $excludePrefixes = []): ?array {
+	public function create(string $label, array $paths, array $excludePrefixes = [], array $opts = []): ?array {
 		if (!defined('ABSPATH')) {
 			return null;
 		}
@@ -108,6 +146,20 @@ final class RestorePoints {
 			'files' => $files,
 		];
 
+		// Optional DB snapshot (best-effort).
+		if (!empty($opts['include_db'])) {
+			require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-db-backup.php';
+			$db = new DbBackup($this->storage);
+			$dbRes = $db->export([
+				'tables_mode' => (string) ($opts['db_tables_mode'] ?? 'wp_core'),
+				'custom_tables' => (string) ($opts['db_custom_tables'] ?? ''),
+				'max_seconds' => (int) ($opts['db_max_seconds'] ?? 20),
+				'label' => $label,
+				'restore_point_id' => $id,
+			]);
+			$manifest['db'] = $dbRes;
+		}
+
 		$ok = $this->storage->write_json_gz($manifestPath, $manifest);
 		if (!$ok) {
 			return null;
@@ -115,6 +167,16 @@ final class RestorePoints {
 
 		$this->prune_old_restore_points();
 		return ['id' => $id, 'manifest' => $manifestPath, 'counts' => $counts];
+	}
+
+	public function restore_db(string $restorePointId): array {
+		require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-db-backup.php';
+		$manifest = $this->load_manifest($restorePointId);
+		if (!$manifest || empty($manifest['db']) || !is_array($manifest['db'])) {
+			return ['ok' => false, 'message' => 'no db snapshot in restore point'];
+		}
+		$db = new DbBackup($this->storage);
+		return $db->restore_from_manifest($manifest['db']);
 	}
 
 	public function list(int $limit = 20): array {

@@ -78,6 +78,7 @@ final class UpgraderHooks {
 		// Incremental restore point (granulare) per plugin/tema prima dell'upgrade.
 		if (!empty($settings['enabled_modules']) && is_array($settings['enabled_modules']) && in_array('backup', $settings['enabled_modules'], true)) {
 			$paths = [];
+			$includeDb = !empty($settings['rp_pre_upgrade_include_db']);
 			if ($type === 'plugin') {
 				$pluginFile = (string) ($hook_extra['plugin'] ?? '');
 				$dir = $this->plugin_dir_from_plugin_file($pluginFile);
@@ -91,10 +92,21 @@ final class UpgraderHooks {
 				if ($dir && is_dir($dir)) {
 					$paths[] = ltrim(str_replace('\\', '/', substr($dir, strlen(rtrim(ABSPATH, '/\\')))), '/');
 				}
+			} elseif ($type === 'core' && !empty($settings['rp_pre_upgrade_core_files'])) {
+				$paths[] = 'wp-admin';
+				$paths[] = 'wp-includes';
+				$paths[] = 'index.php';
+				$paths[] = 'wp-load.php';
+				$paths[] = 'wp-settings.php';
 			}
 			if ($paths) {
 				$exclude = ['wp-content/uploads/', 'wp-content/cache/', 'wp-content/upgrade/'];
-				$rp = $this->restorePoints->create('pre_' . $type, $paths, $exclude);
+				$rp = $this->restorePoints->create('pre_' . $type, $paths, $exclude, [
+					'include_db' => $includeDb,
+					'db_tables_mode' => (string) ($settings['rp_db_tables'] ?? 'wp_core'),
+					'db_custom_tables' => (string) ($settings['rp_db_custom_tables'] ?? ''),
+					'db_max_seconds' => (int) ($settings['rp_db_max_seconds'] ?? 20),
+				]);
 				$restorePointId = is_array($rp) ? ($rp['id'] ?? null) : null;
 			}
 		}

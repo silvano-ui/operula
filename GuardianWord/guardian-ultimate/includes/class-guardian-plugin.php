@@ -22,6 +22,9 @@ final class Plugin {
 
 	private function __construct() {}
 
+	private const CRON_LICENSE_REFRESH = 'guardian_license_refresh';
+	private const CRON_RESTORE_POINT = 'guardian_restore_point_scheduled';
+
 	public static function activate(): void {
 		if (!function_exists('wp_upload_dir')) {
 			return;
@@ -34,17 +37,43 @@ final class Plugin {
 		$storage->maybe_install_mu_loader();
 
 		// Pianifica refresh licenza (WHMCS mode) se non già pianificato.
-		if (!wp_next_scheduled('guardian_license_refresh')) {
-			wp_schedule_event(time() + 300, 'hourly', 'guardian_license_refresh');
+		if (!wp_next_scheduled(self::CRON_LICENSE_REFRESH)) {
+			wp_schedule_event(time() + 300, 'hourly', self::CRON_LICENSE_REFRESH);
 		}
+
+		self::reschedule_restore_points();
 	}
 
 	public static function deactivate(): void {
 		// Non rimuoviamo snapshot/backup automaticamente.
-		$ts = wp_next_scheduled('guardian_license_refresh');
+		$ts = wp_next_scheduled(self::CRON_LICENSE_REFRESH);
 		if ($ts) {
-			wp_unschedule_event($ts, 'guardian_license_refresh');
+			wp_unschedule_event($ts, self::CRON_LICENSE_REFRESH);
 		}
+		$ts2 = wp_next_scheduled(self::CRON_RESTORE_POINT);
+		if ($ts2) {
+			wp_unschedule_event($ts2, self::CRON_RESTORE_POINT);
+		}
+	}
+
+	public static function reschedule_restore_points(): void {
+		if (!function_exists('wp_next_scheduled')) {
+			return;
+		}
+		$storage = new Storage();
+		$settings = $storage->get_settings();
+		$schedule = isset($settings['rp_schedule']) ? (string) $settings['rp_schedule'] : 'daily';
+		$schedule = in_array($schedule, ['off', 'hourly', 'daily'], true) ? $schedule : 'daily';
+
+		$ts = wp_next_scheduled(self::CRON_RESTORE_POINT);
+		if ($ts) {
+			wp_unschedule_event($ts, self::CRON_RESTORE_POINT);
+		}
+		if ($schedule === 'off') {
+			return;
+		}
+		// Start in 10 minutes, then follow schedule.
+		wp_schedule_event(time() + 600, $schedule, self::CRON_RESTORE_POINT);
 	}
 
 	public function boot(): void {
@@ -55,10 +84,29 @@ final class Plugin {
 		$this->admin = new Admin($this->storage, $this->license);
 		$this->admin->register();
 
-		add_action('guardian_license_refresh', function (): void {
+		add_action(self::CRON_LICENSE_REFRESH, function (): void {
 			if ($this->license->get_mode() === 'whmcs') {
 				$this->license->refresh_from_whmcs_if_needed(false);
 			}
+		});
+
+		add_action(self::CRON_RESTORE_POINT, function (): void {
+			// Create scheduled restore point (only if licensed + backup module enabled).
+			if (!$this->license->is_valid()) {
+				return;
+			}
+			$payload = $this->license->get_payload();
+			$allowed = Modules::allowed_from_license($payload);
+			if (!in_array(Modules::BACKUP, $allowed, true)) {
+				return;
+			}
+			$settings = $this->storage->get_settings();
+			$enabled = isset($settings['enabled_modules']) && is_array($settings['enabled_modules']) ? $settings['enabled_modules'] : [];
+			if (!in_array('backup', $enabled, true)) {
+				return;
+			}
+			$rp = new RestorePoints($this->storage);
+			$rp->create_scheduled_from_settings($settings);
 		});
 
 		// Se licenza non valida, non attiviamo i moduli.

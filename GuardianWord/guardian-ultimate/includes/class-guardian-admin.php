@@ -121,7 +121,21 @@ final class Admin {
 		$settings['full_backup_on_upgrade'] = !empty($_POST['full_backup_on_upgrade']);
 		$settings['full_restore_include_wp_config'] = !empty($_POST['full_restore_include_wp_config']);
 
+		// Restore point schedule/options
+		$settings['rp_schedule'] = isset($_POST['rp_schedule']) ? sanitize_text_field((string) wp_unslash($_POST['rp_schedule'])) : 'daily';
+		$settings['rp_scope_plugins_themes'] = !empty($_POST['rp_scope_plugins_themes']);
+		$settings['rp_scope_wp_config'] = !empty($_POST['rp_scope_wp_config']);
+		$settings['rp_scope_core'] = !empty($_POST['rp_scope_core']);
+		$settings['rp_scope_uploads'] = !empty($_POST['rp_scope_uploads']);
+		$settings['rp_include_db'] = !empty($_POST['rp_include_db']);
+		$settings['rp_db_tables'] = isset($_POST['rp_db_tables']) ? sanitize_text_field((string) wp_unslash($_POST['rp_db_tables'])) : 'wp_core';
+		$settings['rp_db_custom_tables'] = isset($_POST['rp_db_custom_tables']) ? (string) wp_unslash($_POST['rp_db_custom_tables']) : '';
+		$settings['rp_db_max_seconds'] = isset($_POST['rp_db_max_seconds']) ? (int) $_POST['rp_db_max_seconds'] : 20;
+		$settings['rp_pre_upgrade_include_db'] = !empty($_POST['rp_pre_upgrade_include_db']);
+		$settings['rp_pre_upgrade_core_files'] = !empty($_POST['rp_pre_upgrade_core_files']);
+
 		$this->storage->update_settings($settings);
+		Plugin::reschedule_restore_points();
 
 		wp_safe_redirect(add_query_arg(['guardian_notice' => 'settings_saved'], admin_url('admin.php?page=guardian')));
 		exit;
@@ -272,10 +286,19 @@ final class Admin {
 
 		$id = isset($_POST['restore_point_id']) ? (string) wp_unslash($_POST['restore_point_id']) : '';
 		$path = isset($_POST['restore_rel_path']) ? (string) wp_unslash($_POST['restore_rel_path']) : '';
+		$custom = isset($_POST['restore_rel_path_custom']) ? (string) wp_unslash($_POST['restore_rel_path_custom']) : '';
+		if (trim($custom) !== '') {
+			$path = $custom;
+		}
 		$deleteFirst = !empty($_POST['delete_first']);
+		$restoreDb = !empty($_POST['restore_db']);
 
 		$r = $this->restorePoints()->restore_path($id, $path, $deleteFirst);
 		$ok = !empty($r['ok']);
+		if ($ok && $restoreDb) {
+			$db = $this->restorePoints()->restore_db($id);
+			$ok = !empty($db['ok']);
+		}
 
 		wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'rp_restore_ok' : 'rp_restore_fail'], admin_url('admin.php?page=guardian')));
 		exit;
@@ -430,8 +453,14 @@ final class Admin {
 					echo '<input type="hidden" name="action" value="guardian_restore_from_point" />';
 					wp_nonce_field('guardian_restore_from_point');
 					echo '<input type="hidden" name="restore_point_id" value="' . esc_attr($id) . '" />';
-					echo '<input type="text" name="restore_rel_path" style="width: 420px;" placeholder="es: wp-content/plugins/slug/ (o file.php)" />';
+					echo '<select name="restore_rel_path" style="width: 220px;">';
+					echo '<option value="">' . esc_html__('(seleziona target)', 'guardian') . '</option>';
+					echo '<option value="wp-content/plugins/">' . esc_html__('Plugins (tutti)', 'guardian') . '</option>';
+					echo '<option value="wp-content/themes/">' . esc_html__('Themes (tutti)', 'guardian') . '</option>';
+					echo '</select> ';
+					echo '<input type="text" name="restore_rel_path_custom" style="width: 240px;" placeholder="oppure path custom: wp-content/plugins/slug/" />';
 					echo ' <label><input type="checkbox" name="delete_first" value="1" /> ' . esc_html__('cancella prima', 'guardian') . '</label>';
+					echo ' <label><input type="checkbox" name="restore_db" value="1" /> ' . esc_html__('restore DB', 'guardian') . '</label>';
 					echo ' <button class="button" type="submit" onclick="return confirm(\'Eseguire restore del path indicato da questo restore point?\');">' . esc_html__('Restore', 'guardian') . '</button>';
 					echo '</form>';
 					echo '</td>';
@@ -454,6 +483,41 @@ final class Admin {
 		echo '<label><input type="checkbox" name="include_uploads" ' . checked(!empty($settings['include_uploads']), true, false) . ' /> ' . esc_html__('Includi wp-content/uploads negli snapshot (può essere molto lento)', 'guardian') . '</label><br />';
 		echo '<label><input type="checkbox" name="full_backup_on_upgrade" ' . checked(!empty($settings['full_backup_on_upgrade']), true, false) . ' /> ' . esc_html__('Crea backup ZIP completo dell’installazione prima di install/upgrade (molto lento/pesante)', 'guardian') . '</label><br />';
 		echo '<label style="margin-left: 18px;"><input type="checkbox" name="full_restore_include_wp_config" ' . checked(!empty($settings['full_restore_include_wp_config']), true, false) . ' /> ' . esc_html__('Nel ripristino completo includi anche wp-config.php (rischioso)', 'guardian') . '</label><br />';
+
+		echo '<hr style="max-width:1100px; margin: 16px 0;" />';
+		echo '<h3>' . esc_html__('Restore point schedulati (Backup incrementale)', 'guardian') . '</h3>';
+		echo '<p style="max-width:1100px;">' . esc_html__('Crea automaticamente restore point incrementali. Consigliato per “set and forget”.', 'guardian') . '</p>';
+		echo '<p><label><strong>' . esc_html__('Frequenza', 'guardian') . '</strong> ';
+		$rpSchedule = (string) ($settings['rp_schedule'] ?? 'daily');
+		echo '<select name="rp_schedule">';
+		echo '<option value="off"' . selected($rpSchedule, 'off', false) . '>' . esc_html__('Off', 'guardian') . '</option>';
+		echo '<option value="hourly"' . selected($rpSchedule, 'hourly', false) . '>' . esc_html__('Hourly', 'guardian') . '</option>';
+		echo '<option value="daily"' . selected($rpSchedule, 'daily', false) . '>' . esc_html__('Daily', 'guardian') . '</option>';
+		echo '</select></label></p>';
+
+		echo '<p><strong>' . esc_html__('Scope', 'guardian') . '</strong><br />';
+		echo '<label><input type="checkbox" name="rp_scope_plugins_themes" ' . checked(!empty($settings['rp_scope_plugins_themes']), true, false) . ' /> ' . esc_html__('Plugin + Temi', 'guardian') . '</label><br />';
+		echo '<label><input type="checkbox" name="rp_scope_wp_config" ' . checked(!empty($settings['rp_scope_wp_config']), true, false) . ' /> ' . esc_html__('Include wp-config.php', 'guardian') . '</label><br />';
+		echo '<label><input type="checkbox" name="rp_scope_core" ' . checked(!empty($settings['rp_scope_core']), true, false) . ' /> ' . esc_html__('Include core (wp-admin/wp-includes) (pesante)', 'guardian') . '</label><br />';
+		echo '<label><input type="checkbox" name="rp_scope_uploads" ' . checked(!empty($settings['rp_scope_uploads']), true, false) . ' /> ' . esc_html__('Include uploads (molto pesante)', 'guardian') . '</label></p>';
+
+		echo '<p><strong>' . esc_html__('Database (opzionale)', 'guardian') . '</strong><br />';
+		echo '<label><input type="checkbox" name="rp_include_db" ' . checked(!empty($settings['rp_include_db']), true, false) . ' /> ' . esc_html__('Include snapshot DB nel restore point (best-effort)', 'guardian') . '</label><br />';
+		$rpDbTables = (string) ($settings['rp_db_tables'] ?? 'wp_core');
+		echo '<label>' . esc_html__('Tabelle', 'guardian') . ' ';
+		echo '<select name="rp_db_tables">';
+		echo '<option value="wp_core"' . selected($rpDbTables, 'wp_core', false) . '>' . esc_html__('WP core (posts/options/users/…) ', 'guardian') . '</option>';
+		echo '<option value="all_prefix"' . selected($rpDbTables, 'all_prefix', false) . '>' . esc_html__('Tutte le tabelle con prefisso WP', 'guardian') . '</option>';
+		echo '<option value="custom"' . selected($rpDbTables, 'custom', false) . '>' . esc_html__('Custom (lista)', 'guardian') . '</option>';
+		echo '</select></label><br />';
+		echo '<label>' . esc_html__('Custom tables (una per riga)', 'guardian') . '<br /><textarea name="rp_db_custom_tables" rows="3" style="width:100%; max-width:1100px;">' . esc_textarea((string) ($settings['rp_db_custom_tables'] ?? '')) . '</textarea></label><br />';
+		echo '<label>' . esc_html__('Max seconds per dump', 'guardian') . ' <input type="number" name="rp_db_max_seconds" value="' . esc_attr((string) ((int) ($settings['rp_db_max_seconds'] ?? 20))) . '" min="5" max="120" /></label>';
+		echo '</p>';
+
+		echo '<p><strong>' . esc_html__('Pre-upgrade', 'guardian') . '</strong><br />';
+		echo '<label><input type="checkbox" name="rp_pre_upgrade_include_db" ' . checked(!empty($settings['rp_pre_upgrade_include_db']), true, false) . ' /> ' . esc_html__('Include DB nei restore point pre-upgrade (plugin/tema)', 'guardian') . '</label><br />';
+		echo '<label><input type="checkbox" name="rp_pre_upgrade_core_files" ' . checked(!empty($settings['rp_pre_upgrade_core_files']), true, false) . ' /> ' . esc_html__('Crea restore point anche prima di core update (pesante)', 'guardian') . '</label></p>';
+
 		submit_button(__('Salva impostazioni', 'guardian'));
 		echo '</form>';
 

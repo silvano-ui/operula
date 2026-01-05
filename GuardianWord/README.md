@@ -47,8 +47,10 @@ Guardian Ultimate abilita moduli in base a `feat.modules` nel token (WHMCS) e co
 
 ### Backup incrementale (MVP)
 
-Nel modulo **Backup** è disponibile un “restore point” incrementale con dedup (file-level) e restore granulare:
+Nel modulo **Backup** è disponibile un “restore point” incrementale con dedup (file-level) e restore granulare + scheduler:
 - creazione manuale da Admin
 - creazione automatica pre-upgrade per plugin/tema (quando il modulo Backup è attivo)
+- creazione automatica schedulata (hourly/daily/off) con scope configurabile
 - restore di un path (file o directory) a partire da un restore point
+- (opzionale) snapshot DB dentro il restore point (best-effort) + restore DB
 

@@ -107,6 +107,20 @@ final class Storage {
 			'enabled_modules' => ['core', 'integrity', 'backup'],
 			'rp_keep_last' => 10,
 			'rp_max_blob_bytes' => 20 * 1024 * 1024, // 20MB
+			// Restore point schedule/options
+			'rp_schedule' => 'daily', // off|hourly|daily
+			'rp_scope_plugins_themes' => true,
+			'rp_scope_wp_config' => true,
+			'rp_scope_core' => false,
+			'rp_scope_uploads' => false,
+			// DB snapshot inside restore point (best-effort)
+			'rp_include_db' => false,
+			'rp_db_tables' => 'wp_core', // wp_core|all_prefix|custom
+			'rp_db_custom_tables' => '',
+			'rp_db_max_seconds' => 20,
+			// Pre-upgrade restore points
+			'rp_pre_upgrade_include_db' => false,
+			'rp_pre_upgrade_core_files' => false,
 		];
 		$opt = get_option(self::OPTION_SETTINGS);
 		return is_array($opt) ? array_merge($defaults, $opt) : $defaults;
