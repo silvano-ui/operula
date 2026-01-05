@@ -9,4 +9,4 @@ Scripta manent. Semper.
 
 ## Guardian (WordPress plugin)
 
-Nel repo trovi anche un plugin WordPress in `guardian/` (snapshot hash file, report cambiamenti post install/upgrade, diff e rollback best-effort). Vedi `guardian/readme.txt` per installazione e limiti.
+Nel repo trovi anche un plugin WordPress in `GuardianWord/guardian/` (snapshot hash file, report cambiamenti post install/upgrade, diff e rollback best-effort) con sistema licenza e tool di generazione token. Vedi `GuardianWord/README.md`.

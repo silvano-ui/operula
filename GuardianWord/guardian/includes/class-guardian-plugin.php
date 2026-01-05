@@ -6,6 +6,7 @@ final class Plugin {
 	private static ?Plugin $instance = null;
 
 	private Storage $storage;
+	private License $license;
 	private Scanner $scanner;
 	private Backup $backup;
 	private UpgraderHooks $upgrader;
@@ -38,14 +39,29 @@ final class Plugin {
 
 	public function boot(): void {
 		$this->storage = new Storage();
+		$this->license = new License($this->storage);
+
+		// Admin UI resta disponibile per inserire la licenza.
+		$this->admin = new Admin($this->storage, $this->license);
+		$this->admin->register();
+
+		// Se licenza non valida, non attiviamo monitoraggio/rollback.
+		if (!$this->license->is_valid()) {
+			add_action('admin_notices', function (): void {
+				if (!current_user_can('manage_options')) {
+					return;
+				}
+				$st = $this->license->status();
+				echo '<div class="notice notice-error"><p><strong>Guardian</strong>: ' . esc_html($st['message'] ?? 'Licenza non valida.') . ' <a href="' . esc_url(admin_url('admin.php?page=guardian')) . '">' . esc_html__('Inserisci licenza', 'guardian') . '</a></p></div>';
+			});
+			return;
+		}
+
 		$this->scanner = new Scanner($this->storage);
 		$this->backup  = new Backup($this->storage);
 
 		$this->upgrader = new UpgraderHooks($this->storage, $this->scanner, $this->backup);
 		$this->upgrader->register();
-
-		$this->admin = new Admin($this->storage, $this->scanner, $this->backup);
-		$this->admin->register();
 
 		// Crash guard: efficace soprattutto se caricato come MU-plugin.
 		$this->register_crash_guard();

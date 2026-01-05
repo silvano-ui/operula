@@ -20,6 +20,7 @@ define('GUARDIAN_PLUGIN_DIR', __DIR__);
 
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-plugin.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-storage.php';
+require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-license.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-scanner.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-backup.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-upgrader-hooks.php';

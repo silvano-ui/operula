@@ -10,6 +10,14 @@ License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Guardian crea snapshot (hash) dell'installazione, rileva quali file sono cambiati dopo install/upgrade di plugin/temi, mostra un diff (quando possibile) e permette rollback best-effort.
 
+== Licenza ==
+
+Guardian funziona **solo** con una licenza valida.
+
+- Incolla il token in **Bacheca > Guardian > Licenza**
+- Il token è firmato (Ed25519): il plugin verifica la firma con una chiave pubblica incorporata.
+- Lo script di generazione (chiave privata) va tenuto **separato** e non deve mai essere caricato su WordPress.
+
 == Installazione ==
 
 1) Copia la cartella `guardian/` in `wp-content/plugins/guardian/`

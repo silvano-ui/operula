@@ -4,17 +4,18 @@ namespace Guardian;
 
 final class Admin {
 	private Storage $storage;
-	private Scanner $scanner;
-	private Backup $backup;
+	private License $license;
+	private ?Scanner $scanner = null;
+	private ?Backup $backup = null;
 
-	public function __construct(Storage $storage, Scanner $scanner, Backup $backup) {
+	public function __construct(Storage $storage, License $license) {
 		$this->storage = $storage;
-		$this->scanner = $scanner;
-		$this->backup  = $backup;
+		$this->license = $license;
 	}
 
 	public function register(): void {
 		add_action('admin_menu', [$this, 'admin_menu']);
+		add_action('admin_post_guardian_save_license', [$this, 'handle_save_license']);
 		add_action('admin_post_guardian_create_snapshot', [$this, 'handle_create_snapshot']);
 		add_action('admin_post_guardian_rollback_last', [$this, 'handle_rollback_last']);
 		add_action('admin_post_guardian_restore_full_last', [$this, 'handle_restore_full_last']);
@@ -38,9 +39,12 @@ final class Admin {
 			wp_die(__('Non autorizzato.', 'guardian'));
 		}
 		check_admin_referer('guardian_create_snapshot');
+		if (!$this->ensure_licensed_or_die()) {
+			return;
+		}
 
 		$this->storage->ensure_directories();
-		$snap = $this->scanner->create_snapshot('manual', [
+		$snap = $this->scanner()->create_snapshot('manual', [
 			'operation' => [
 				'type' => 'manual',
 			],
@@ -56,10 +60,13 @@ final class Admin {
 			wp_die(__('Non autorizzato.', 'guardian'));
 		}
 		check_admin_referer('guardian_rollback_last');
+		if (!$this->ensure_licensed_or_die()) {
+			return;
+		}
 
 		$op = $this->storage->get_last_operation();
 		if ($op) {
-			$this->backup->rollback_last_operation($op);
+			$this->backup()->rollback_last_operation($op);
 		}
 
 		wp_safe_redirect(add_query_arg(['guardian_notice' => 'rollback_done'], admin_url('admin.php?page=guardian')));
@@ -71,6 +78,9 @@ final class Admin {
 			wp_die(__('Non autorizzato.', 'guardian'));
 		}
 		check_admin_referer('guardian_restore_full_last');
+		if (!$this->ensure_licensed_or_die()) {
+			return;
+		}
 
 		$op = $this->storage->get_last_operation();
 		$zip = $op && !empty($op['site_backup_zip']) ? (string) $op['site_backup_zip'] : '';
@@ -79,7 +89,7 @@ final class Admin {
 
 		$ok = false;
 		if ($zip && defined('ABSPATH')) {
-			$ok = $this->backup->restore_installation_from_backup($zip, ABSPATH, $includeWpConfig);
+			$ok = $this->backup()->restore_installation_from_backup($zip, ABSPATH, $includeWpConfig);
 		}
 
 		wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'full_restore_done' : 'full_restore_fail'], admin_url('admin.php?page=guardian')));
@@ -91,6 +101,9 @@ final class Admin {
 			wp_die(__('Non autorizzato.', 'guardian'));
 		}
 		check_admin_referer('guardian_save_settings');
+		if (!$this->ensure_licensed_or_die()) {
+			return;
+		}
 
 		$settings = $this->storage->get_settings();
 		$settings['auto_backup_on_upgrade'] = !empty($_POST['auto_backup_on_upgrade']);
@@ -106,6 +119,19 @@ final class Admin {
 		exit;
 	}
 
+	public function handle_save_license(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_save_license');
+
+		$token = isset($_POST['license_token']) ? (string) wp_unslash($_POST['license_token']) : '';
+		$this->license->save_token($token);
+		$st = $this->license->status();
+		wp_safe_redirect(add_query_arg(['guardian_notice' => !empty($st['ok']) ? 'license_ok' : 'license_fail'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
 	public function render_page(): void {
 		if (!current_user_can('manage_options')) {
 			wp_die(__('Non autorizzato.', 'guardian'));
@@ -113,9 +139,14 @@ final class Admin {
 
 		$op = $this->storage->get_last_operation();
 		$settings = $this->storage->get_settings();
+		$licenseStatus = $this->license->status();
+		$licensed = !empty($licenseStatus['ok']);
 
 		$diffPath = isset($_GET['guardian_diff']) ? (string) $_GET['guardian_diff'] : '';
 		if ($diffPath !== '') {
+			if (!$licensed) {
+				wp_die(__('Licenza non valida: impossibile mostrare diff.', 'guardian'));
+			}
 			$this->render_diff_view($diffPath, $op);
 			return;
 		}
@@ -124,6 +155,22 @@ final class Admin {
 		echo '<h1>Guardian</h1>';
 
 		$this->render_notices();
+
+		echo '<h2>' . esc_html__('Licenza', 'guardian') . '</h2>';
+		echo '<p>' . esc_html($licenseStatus['message'] ?? '') . '</p>';
+		echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
+		echo '<input type="hidden" name="action" value="guardian_save_license" />';
+		wp_nonce_field('guardian_save_license');
+		echo '<textarea name="license_token" rows="4" style="width: 100%; max-width: 1100px;" placeholder="Incolla qui la licenza (token)">' . esc_textarea($this->license->get_token()) . '</textarea>';
+		submit_button(__('Salva licenza', 'guardian'));
+		echo '</form>';
+
+		if (!$licensed) {
+			echo '<hr />';
+			echo '<p><strong>' . esc_html__('Guardian è disattivato finché non inserisci una licenza valida.', 'guardian') . '</strong></p>';
+			echo '</div>';
+			return;
+		}
 
 		echo '<h2>' . esc_html__('Azioni rapide', 'guardian') . '</h2>';
 		echo '<p>';
@@ -256,13 +303,13 @@ final class Admin {
 			$pluginDirName = $this->plugin_dirname_from_plugin_file($pluginFile);
 			if ($pluginDirName && strpos($rel, 'wp-content/plugins/' . $pluginDirName . '/') === 0) {
 				$inner = $pluginDirName . '/' . substr($rel, strlen('wp-content/plugins/' . $pluginDirName . '/'));
-				$old = $this->backup->read_file_from_backup_zip($zip, $inner);
+				$old = $this->backup()->read_file_from_backup_zip($zip, $inner);
 			}
 		} elseif ($zip && $type === 'theme') {
 			$themeSlug = (string) ($op['theme'] ?? '');
 			if ($themeSlug && strpos($rel, 'wp-content/themes/' . $themeSlug . '/') === 0) {
 				$inner = $themeSlug . '/' . substr($rel, strlen('wp-content/themes/' . $themeSlug . '/'));
-				$old = $this->backup->read_file_from_backup_zip($zip, $inner);
+				$old = $this->backup()->read_file_from_backup_zip($zip, $inner);
 			}
 		}
 
@@ -317,6 +364,8 @@ final class Admin {
 			'full_restore_done' => ['success', __('Ripristino completo applicato (best-effort).', 'guardian')],
 			'full_restore_fail' => ['error', __('Ripristino completo non riuscito.', 'guardian')],
 			'settings_saved' => ['success', __('Impostazioni salvate.', 'guardian')],
+			'license_ok' => ['success', __('Licenza valida.', 'guardian')],
+			'license_fail' => ['error', __('Licenza non valida.', 'guardian')],
 		];
 		if ($notice && isset($map[$notice])) {
 			[$cls, $msg] = $map[$notice];
@@ -337,6 +386,29 @@ final class Admin {
 	private function is_probably_text(string $s): bool {
 		// Heuristica semplice: se contiene byte null è quasi certamente binario.
 		return strpos($s, "\0") === false;
+	}
+
+	private function ensure_licensed_or_die(): bool {
+		$st = $this->license->status();
+		if (!empty($st['ok'])) {
+			return true;
+		}
+		wp_die(esc_html($st['message'] ?? __('Licenza non valida.', 'guardian')));
+		return false;
+	}
+
+	private function scanner(): Scanner {
+		if ($this->scanner === null) {
+			$this->scanner = new Scanner($this->storage);
+		}
+		return $this->scanner;
+	}
+
+	private function backup(): Backup {
+		if ($this->backup === null) {
+			$this->backup = new Backup($this->storage);
+		}
+		return $this->backup;
 	}
 }
 
