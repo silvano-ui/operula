@@ -42,7 +42,8 @@ try {
 		exit;
 	}
 	$uaAllow = Repo::getSetting('uaAllowlist', '');
-	if (!Security::uaAllowed(Security::userAgent(), $uaAllow)) {
+	$uaMode = Repo::getSetting('uaAllowlistMode', 'substring');
+	if (!Security::uaAllowed(Security::userAgent(), $uaAllow, $uaMode)) {
 		http_response_code(403);
 		echo json_encode(['ok' => false, 'status' => 'forbidden', 'message' => 'user-agent not allowed']);
 		exit;

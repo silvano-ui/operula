@@ -64,18 +64,41 @@ final class Security
 	/**
 	 * allowlist: comma-separated substrings. Empty means allow all.
 	 */
-	public static function uaAllowed(string $ua, string $allowlist): bool
+	public static function uaAllowed(string $ua, string $allowlist, string $mode = 'substring'): bool
 	{
 		$allowlist = trim($allowlist);
 		if ($allowlist === '') {
 			return true;
 		}
 		$ua = (string) $ua;
+		$mode = in_array($mode, ['substring', 'exact', 'regex'], true) ? $mode : 'substring';
 		$parts = array_filter(array_map('trim', explode(',', $allowlist)));
 		foreach ($parts as $p) {
 			if ($p === '') {
 				continue;
 			}
+			if ($mode === 'exact') {
+				if ($ua === $p) {
+					return true;
+				}
+				continue;
+			}
+			if ($mode === 'regex') {
+				$pattern = $p;
+				// If not delimited, wrap with ~...~ (escape ~).
+				$delim = substr($pattern, 0, 1);
+				$last = substr($pattern, -1);
+				$isDelimited = ($delim === $last) && in_array($delim, ['~', '/', '#', '!'], true) && strlen($pattern) >= 2;
+				if (!$isDelimited) {
+					$pattern = '~' . str_replace('~', '\~', $pattern) . '~';
+				}
+				$ok = @preg_match($pattern, $ua);
+				if ($ok === 1) {
+					return true;
+				}
+				continue;
+			}
+			// substring (default)
 			if (strpos($ua, $p) !== false) {
 				return true;
 			}

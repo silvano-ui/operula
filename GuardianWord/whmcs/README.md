@@ -66,6 +66,11 @@ Protezione aggiuntiva:
 - **install binding**: se abilitato, l’API richiede `install_id` e lo lega alla prima installazione (reset necessario per cambiare)
 - **User-Agent allowlist**: se configurata, blocca tutto il resto (default `Guardian/`)
 
+User-Agent allowlist mode:
+- `substring` (default): match se UA contiene uno dei valori
+- `exact`: match solo se UA == valore
+- `regex`: match con pattern (se non delimitato viene wrappato con `~...~`)
+
 ### Requisito consigliato
 
 - Usa **HTTPS** per gli endpoint WHMCS.

@@ -54,6 +54,13 @@ function guardian_licensing_config()
 				"Default" => "Guardian/",
 				"Description" => "Comma-separated substrings. Se valorizzato, l'API accetta solo User-Agent che contengono una di queste stringhe.",
 			],
+			"uaAllowlistMode" => [
+				"FriendlyName" => "User-Agent allowlist mode",
+				"Type" => "dropdown",
+				"Options" => "substring,exact,regex",
+				"Default" => "substring",
+				"Description" => "substring: contiene; exact: uguaglianza; regex: pattern (se non delimitato viene wrappato con ~...~).",
+			],
 			"maxClockSkewSeconds" => [
 				"FriendlyName" => "Max clock skew (seconds)",
 				"Type" => "text",
