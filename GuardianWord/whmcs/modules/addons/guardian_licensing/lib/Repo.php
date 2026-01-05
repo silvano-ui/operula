@@ -1,0 +1,171 @@
+<?php
+
+use WHMCS\Database\Capsule;
+
+final class Repo
+{
+	public static function ensureSchema(): void
+	{
+		if (Capsule::schema()->hasTable('mod_guardian_licenses')) {
+			return;
+		}
+		Capsule::schema()->create('mod_guardian_licenses', function ($table) {
+			$table->increments('id');
+			$table->integer('service_id')->unsigned()->unique();
+			$table->string('license_id', 64)->unique();
+			$table->string('domain', 255)->default('');
+			$table->text('token')->nullable();
+			$table->string('status', 32)->default('active'); // active|expired|suspended|terminated
+			$table->integer('issued_at')->unsigned()->default(0);
+			$table->integer('expires_at')->unsigned()->default(0);
+			$table->integer('updated_at')->unsigned()->default(0);
+		});
+	}
+
+	/**
+	 * Issue or refresh license for a service.
+	 *
+	 * $svc: ['service_id','client_id','domain','next_due','status','cycle','license_type']
+	 */
+	public static function getOrIssueForService(array $svc): array
+	{
+		self::ensureSchema();
+		$serviceId = (int) ($svc['service_id'] ?? 0);
+		if ($serviceId <= 0) {
+			return ['ok' => false, 'message' => 'Invalid service'];
+		}
+
+		$row = Capsule::table('mod_guardian_licenses')->where('service_id', $serviceId)->first();
+		$licenseId = $row ? (string) $row->license_id : self::newLicenseId();
+
+		$domain = strtolower(trim((string) ($svc['domain'] ?? '')));
+		$now = time();
+		$exp = self::computeExpiry($svc);
+
+		$status = self::mapServiceStatus((string) ($svc['status'] ?? 'Active'), $exp);
+
+		$keys = Signer::loadKeysFromAddonSettings();
+		if (empty($keys['private_b64'])) {
+			return [
+				'ok' => false,
+				'license_id' => $licenseId,
+				'status' => 'invalid',
+				'message' => 'Missing signing keys in addon settings',
+			];
+		}
+
+		$token = null;
+		if ($status === 'active' && $domain !== '') {
+			$payload = [
+				'v' => 1,
+				'lic' => $licenseId,
+				'dom' => $domain,
+				'iat' => $now,
+				'exp' => $exp,
+				'feat' => [
+					'guardian' => true,
+					'type' => (string) ($svc['license_type'] ?? ''),
+				],
+			];
+			$token = Signer::signToken($payload, $keys['private_b64']);
+		}
+
+		$data = [
+			'service_id' => $serviceId,
+			'license_id' => $licenseId,
+			'domain' => $domain,
+			'token' => $token,
+			'status' => $status,
+			'issued_at' => $now,
+			'expires_at' => $exp,
+			'updated_at' => $now,
+		];
+
+		if ($row) {
+			Capsule::table('mod_guardian_licenses')->where('service_id', $serviceId)->update($data);
+		} else {
+			Capsule::table('mod_guardian_licenses')->insert($data);
+		}
+
+		$data['ok'] = true;
+		return $data;
+	}
+
+	public static function findByLicenseId(string $licenseId): ?array
+	{
+		self::ensureSchema();
+		$row = Capsule::table('mod_guardian_licenses')->where('license_id', $licenseId)->first();
+		if (!$row) {
+			return null;
+		}
+		return [
+			'service_id' => (int) $row->service_id,
+			'license_id' => (string) $row->license_id,
+			'domain' => (string) $row->domain,
+			'token' => is_string($row->token) ? $row->token : null,
+			'status' => (string) $row->status,
+			'issued_at' => (int) $row->issued_at,
+			'expires_at' => (int) $row->expires_at,
+		];
+	}
+
+	public static function updateDomain(string $licenseId, string $domain): void
+	{
+		self::ensureSchema();
+		Capsule::table('mod_guardian_licenses')
+			->where('license_id', $licenseId)
+			->update([
+				'domain' => strtolower(trim($domain)),
+				'updated_at' => time(),
+			]);
+	}
+
+	private static function newLicenseId(): string
+	{
+		return 'GL-' . bin2hex(random_bytes(12));
+	}
+
+	private static function mapServiceStatus(string $whmcsStatus, int $exp): string
+	{
+		$whmcsStatus = strtolower($whmcsStatus);
+		if ($whmcsStatus === 'terminated' || $whmcsStatus === 'cancelled') {
+			return 'terminated';
+		}
+		if ($whmcsStatus === 'suspended' || $whmcsStatus === 'fraud') {
+			return 'suspended';
+		}
+		if ($exp > 0 && time() > $exp) {
+			return 'expired';
+		}
+		return 'active';
+	}
+
+	/**
+	 * Expiry rules:
+	 * - if license_type == trial: now + trialDays (addon setting)
+	 * - else: use next due date (service) end-of-day UTC (best-effort)
+	 */
+	private static function computeExpiry(array $svc): int
+	{
+		$type = strtolower((string) ($svc['license_type'] ?? ''));
+		if ($type === 'trial') {
+			$val = Capsule::table('tbladdonmodules')
+				->where('module', 'guardian_licensing')
+				->where('setting', 'trialDays')
+				->value('value');
+			$trialDays = is_string($val) ? (int) $val : 14;
+			if ($trialDays <= 0) {
+				$trialDays = 14;
+			}
+			return time() + ($trialDays * 86400);
+		}
+
+		$nextDue = (string) ($svc['next_due'] ?? '');
+		if ($nextDue === '' || $nextDue === '0000-00-00') {
+			return 0;
+		}
+		$ts = strtotime($nextDue . ' 23:59:59 UTC');
+		return $ts ? (int) $ts : 0;
+	}
+}
+
