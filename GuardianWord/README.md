@@ -67,3 +67,6 @@ Se la licenza include `feat.backup_pro` (WHMCS: `guardian_backup_tier=pro`), puo
 - `modules/core`, `modules/integrity`, `modules/backup`, …
 - i file in `includes/` sono stub di retro-compatibilità che caricano i file reali dai moduli.
 
+Bootstrap:
+- `guardian-ultimate.php` è minimale (costanti + autoloader + `Bootstrap::init()`).
+
