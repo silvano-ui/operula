@@ -59,6 +59,7 @@ Se la licenza include `backup_pro`, puoi usare DB engine **Pro**:
 - dump a chunk con resume (più robusto su hosting lenti)
 - file separati per tabella/chunk + schema separato
 - restore più affidabile rispetto al dump unico “basic”
+- **Pro+**: export/restore DB come job in background con progress (non blocca la pagina)
 
 == Limitazioni importanti ==
 

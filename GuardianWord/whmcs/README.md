@@ -101,3 +101,5 @@ Il token include anche:
 - `feat.modules`: array moduli abilitati (es. `["core","integrity","backup"]`)
 - `feat.backup_pro`: true/false (feature a pagamento “Backup Pro”)
 
+Nota: “Backup Pro+” è incluso in `feat.backup_pro` (stessa capability).
+

@@ -59,4 +59,9 @@ Nel modulo **Backup** è disponibile un “restore point” incrementale con ded
 Se la licenza include `feat.backup_pro` (WHMCS: `guardian_backup_tier=pro`), puoi selezionare **DB engine = Pro**:
 - snapshot DB a chunk con resume (più stabile)
 - restore DB per step (schema + chunk per tabella)
+- **Pro+**: export/restore DB come job in background con progress
+
+### Architettura / modularità futura
+
+`guardian-ultimate/` ora include un autoloader minimale (`includes/class-guardian-autoloader.php`) per mantenere ordine e permettere aggiunta di moduli/integrazioni senza riscrivere tutto ogni volta (senza rompere i file legacy).
 

@@ -24,6 +24,7 @@ final class Admin {
 		add_action('admin_post_guardian_save_modules', [$this, 'handle_save_modules']);
 		add_action('admin_post_guardian_create_restore_point', [$this, 'handle_create_restore_point']);
 		add_action('admin_post_guardian_restore_from_point', [$this, 'handle_restore_from_point']);
+		add_action('admin_post_guardian_dbpro_restore_start', [$this, 'handle_dbpro_restore_start']);
 		add_action('admin_post_guardian_create_snapshot', [$this, 'handle_create_snapshot']);
 		add_action('admin_post_guardian_rollback_last', [$this, 'handle_rollback_last']);
 		add_action('admin_post_guardian_restore_full_last', [$this, 'handle_restore_full_last']);
@@ -297,11 +298,44 @@ final class Admin {
 		$r = $this->restorePoints()->restore_path($id, $path, $deleteFirst);
 		$ok = !empty($r['ok']);
 		if ($ok && $restoreDb) {
+			// If DB engine is Pro, do non-blocking restore job.
+			$manifest = $this->storage->base_dir() ? $this->storage->base_dir() . '/restore-points/' . sanitize_file_name($id) . '.json.gz' : null;
+			$m = ($manifest && file_exists($manifest)) ? $this->storage->read_json_gz($manifest) : null;
+			$engine = is_array($m) && isset($m['db']['engine']) ? (string) $m['db']['engine'] : 'basic';
+			if ($engine === 'pro') {
+				$pro = new DbBackupPro($this->storage);
+				$job = $pro->start_restore_job((array) $m['db']);
+				$ok = !empty($job['ok']);
+				wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'dbpro_restore_started' : 'rp_restore_fail'], admin_url('admin.php?page=guardian')));
+				exit;
+			}
 			$db = $this->restorePoints()->restore_db($id);
 			$ok = !empty($db['ok']);
 		}
 
 		wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'rp_restore_ok' : 'rp_restore_fail'], admin_url('admin.php?page=guardian')));
+		exit;
+	}
+
+	public function handle_dbpro_restore_start(): void {
+		if (!current_user_can('manage_options')) {
+			wp_die(__('Non autorizzato.', 'guardian'));
+		}
+		check_admin_referer('guardian_dbpro_restore_start');
+		if (!$this->ensure_licensed_or_die()) {
+			return;
+		}
+		$rpId = isset($_POST['restore_point_id']) ? (string) wp_unslash($_POST['restore_point_id']) : '';
+		$manifest = $this->storage->base_dir() ? $this->storage->base_dir() . '/restore-points/' . sanitize_file_name($rpId) . '.json.gz' : null;
+		$m = ($manifest && file_exists($manifest)) ? $this->storage->read_json_gz($manifest) : null;
+		if (!is_array($m) || empty($m['db']) || !is_array($m['db'])) {
+			wp_safe_redirect(add_query_arg(['guardian_notice' => 'rp_restore_fail'], admin_url('admin.php?page=guardian')));
+			exit;
+		}
+		$pro = new DbBackupPro($this->storage);
+		$job = $pro->start_restore_job((array) $m['db']);
+		$ok = !empty($job['ok']);
+		wp_safe_redirect(add_query_arg(['guardian_notice' => $ok ? 'dbpro_restore_started' : 'rp_restore_fail'], admin_url('admin.php?page=guardian')));
 		exit;
 	}
 
@@ -438,7 +472,7 @@ final class Admin {
 			if (!$list) {
 				echo '<p><em>' . esc_html__('Nessun restore point ancora.', 'guardian') . '</em></p>';
 			} else {
-				echo '<table class="widefat striped" style="max-width:1100px;"><thead><tr><th>ID</th><th>Label</th><th>Creato</th><th>Files</th><th>Azioni</th></tr></thead><tbody>';
+				echo '<table class="widefat striped" style="max-width:1100px;"><thead><tr><th>ID</th><th>Label</th><th>Creato</th><th>Files</th><th>DB</th><th>Azioni</th></tr></thead><tbody>';
 				foreach ($list as $rp) {
 					$id = (string) ($rp['id'] ?? '');
 					$label = (string) ($rp['label'] ?? '');
@@ -449,6 +483,22 @@ final class Admin {
 					echo '<td>' . esc_html($label) . '</td>';
 					echo '<td>' . esc_html($created) . '</td>';
 					echo '<td>' . esc_html((string) $cnt) . '</td>';
+					// DB info (best-effort: read manifest).
+					$dbCell = '';
+					$manifestPath = $this->storage->base_dir() ? $this->storage->base_dir() . '/restore-points/' . sanitize_file_name($id) . '.json.gz' : null;
+					$m = ($manifestPath && file_exists($manifestPath)) ? $this->storage->read_json_gz($manifestPath) : null;
+					if (is_array($m) && !empty($m['db']) && is_array($m['db'])) {
+						$engine = isset($m['db']['engine']) ? (string) $m['db']['engine'] : 'basic';
+						$status = isset($m['db']['status']) ? (string) $m['db']['status'] : '';
+						$prog = isset($m['db']['progress']['percent']) ? (int) $m['db']['progress']['percent'] : null;
+						$dbCell = esc_html($engine) . ($status ? (' / ' . esc_html($status)) : '');
+						if ($prog !== null) {
+							$dbCell .= ' / ' . esc_html((string) $prog) . '%';
+						}
+					} else {
+						$dbCell = '<em>' . esc_html__('(none)', 'guardian') . '</em>';
+					}
+					echo '<td>' . $dbCell . '</td>';
 					echo '<td>';
 					echo '<form method="post" action="' . esc_url(admin_url('admin-post.php')) . '">';
 					echo '<input type="hidden" name="action" value="guardian_restore_from_point" />';
@@ -469,6 +519,41 @@ final class Admin {
 				}
 				echo '</tbody></table>';
 				echo '<p><small>' . esc_html__('Suggerimento: per ripristinare un plugin usa: wp-content/plugins/nome-plugin/', 'guardian') . '</small></p>';
+			}
+		}
+
+		// DB Pro jobs dashboard (paid).
+		echo '<hr />';
+		echo '<h2>' . esc_html__('DB Pro jobs (Backup Pro)', 'guardian') . '</h2>';
+		$payload = $this->license->get_payload();
+		$backupPro = !empty($payload['feat']['backup_pro']);
+		if (!$backupPro) {
+			echo '<p><em>' . esc_html__('Backup Pro non incluso nel piano.', 'guardian') . '</em></p>';
+		} else {
+			$pro = new DbBackupPro($this->storage);
+			$expJobs = $pro->list_export_jobs(10);
+			$resJobs = $pro->list_restore_jobs(10);
+			echo '<h3>' . esc_html__('Export jobs', 'guardian') . '</h3>';
+			if (!$expJobs) {
+				echo '<p><em>(none)</em></p>';
+			} else {
+				echo '<table class="widefat striped" style="max-width:1100px;"><thead><tr><th>ID</th><th>RP</th><th>Status</th><th>Progress</th><th>Updated</th></tr></thead><tbody>';
+				foreach ($expJobs as $j) {
+					$pct = isset($j['progress']['percent']) ? (int) $j['progress']['percent'] : 0;
+					echo '<tr><td><code>' . esc_html((string) $j['id']) . '</code></td><td>' . esc_html((string) $j['restore_point_id']) . '</td><td>' . esc_html((string) $j['status']) . '</td><td>' . esc_html((string) $pct) . '%</td><td>' . esc_html((string) $j['updated_gm']) . '</td></tr>';
+				}
+				echo '</tbody></table>';
+			}
+			echo '<h3>' . esc_html__('Restore jobs', 'guardian') . '</h3>';
+			if (!$resJobs) {
+				echo '<p><em>(none)</em></p>';
+			} else {
+				echo '<table class="widefat striped" style="max-width:1100px;"><thead><tr><th>ID</th><th>Status</th><th>Progress</th><th>Updated</th></tr></thead><tbody>';
+				foreach ($resJobs as $j) {
+					$pct = isset($j['progress']['percent']) ? (int) $j['progress']['percent'] : 0;
+					echo '<tr><td><code>' . esc_html((string) $j['id']) . '</code></td><td>' . esc_html((string) $j['status']) . '</td><td>' . esc_html((string) $pct) . '%</td><td>' . esc_html((string) $j['updated_gm']) . '</td></tr>';
+				}
+				echo '</tbody></table>';
 			}
 		}
 
@@ -710,6 +795,7 @@ final class Admin {
 			'rp_create_fail' => ['error', __('Creazione restore point non riuscita.', 'guardian')],
 			'rp_restore_ok' => ['success', __('Restore completato.', 'guardian')],
 			'rp_restore_fail' => ['error', __('Restore non riuscito.', 'guardian')],
+			'dbpro_restore_started' => ['success', __('DB Pro restore avviato (background).', 'guardian')],
 		];
 		if ($notice && isset($map[$notice])) {
 			[$cls, $msg] = $map[$notice];

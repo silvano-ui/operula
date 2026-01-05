@@ -25,6 +25,7 @@ final class Plugin {
 	private const CRON_LICENSE_REFRESH = 'guardian_license_refresh';
 	private const CRON_RESTORE_POINT = 'guardian_restore_point_scheduled';
 	private const CRON_DBPRO_EXPORT = 'guardian_dbpro_export';
+	private const CRON_DBPRO_RESTORE = 'guardian_dbpro_restore';
 
 	public static function activate(): void {
 		if (!function_exists('wp_upload_dir')) {
@@ -58,6 +59,10 @@ final class Plugin {
 		$ts3 = wp_next_scheduled(self::CRON_DBPRO_EXPORT);
 		if ($ts3) {
 			wp_unschedule_event($ts3, self::CRON_DBPRO_EXPORT);
+		}
+		$ts4 = wp_next_scheduled(self::CRON_DBPRO_RESTORE);
+		if ($ts4) {
+			wp_unschedule_event($ts4, self::CRON_DBPRO_RESTORE);
 		}
 	}
 
@@ -121,6 +126,14 @@ final class Plugin {
 			}
 			$pro = new DbBackupPro($this->storage);
 			$pro->continue_export_job($jobId);
+		}, 10, 1);
+
+		add_action(self::CRON_DBPRO_RESTORE, function (string $jobId = ''): void {
+			if ($jobId === '') {
+				return;
+			}
+			$pro = new DbBackupPro($this->storage);
+			$pro->continue_restore_job($jobId);
 		}, 10, 1);
 
 		// Se licenza non valida, non attiviamo i moduli.

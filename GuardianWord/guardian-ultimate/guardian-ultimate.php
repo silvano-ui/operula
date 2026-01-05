@@ -18,6 +18,9 @@ define('GUARDIAN_VERSION', '0.2.0');
 define('GUARDIAN_PLUGIN_FILE', __FILE__);
 define('GUARDIAN_PLUGIN_DIR', __DIR__);
 
+require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-autoloader.php';
+Guardian\Autoloader::register();
+
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-plugin.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-storage.php';
 require_once GUARDIAN_PLUGIN_DIR . '/includes/class-guardian-license.php';
